@@ -1,0 +1,92 @@
+<div class="section-title">{{ section_title }}</div>
+<div class="meal-plan-card">
+    <div class="meal-plan-hero">
+        <div>
+            <div class="meal-plan-kicker">{{ plan.kicker|default:"Multi-Agent Planner" }}</div>
+            <div class="meal-plan-title">{{ plan.title|default:"当日三餐推荐" }}</div>
+            <div class="meal-plan-subtitle">{{ plan.architecture }}</div>
+        </div>
+        <span class="badge {% if plan.llm_status.used %}badge-success{% elif plan.llm_status.enabled %}badge-warning{% else %}badge-primary{% endif %}">
+            {% if plan.llm_status.used %}模型已生成{% elif plan.llm_status.enabled %}等待配置{% else %}本地评分{% endif %}
+        </span>
+    </div>
+
+    <div class="meal-plan-grid">
+        {% for meal in plan.meals %}
+        <div class="meal-card">
+            <div class="meal-card-top">
+                <div>
+                    <div class="meal-label">{{ meal.label }}</div>
+                    <div class="meal-intent">{{ meal.intent }}</div>
+                </div>
+                {% if meal.selected %}
+                <div class="meal-score">{{ meal.selected.score }}</div>
+                {% endif %}
+            </div>
+
+            {% if meal.selected %}
+            <a href="{% url 'recipes:detail' pk=meal.selected.recipe.pk %}" class="meal-recipe-link">
+                {{ meal.selected.recipe.name }}
+            </a>
+            <div class="meal-meta">
+                命中{{ meal.selected.matched_ingredient_count }}/{{ meal.selected.total_ingredient_count }}种食材
+                | 覆盖{{ meal.selected.coverage_percent }}%
+                {% if meal.selected.estimated_cost %}| 估算 ¥{{ meal.selected.estimated_cost|floatformat:2 }}{% endif %}
+            </div>
+            {% if meal.selected.matched_dish_names %}
+            <div class="meal-tags">
+                {% for dish_name in meal.selected.matched_dish_names %}
+                <span class="tag">{{ dish_name }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="meal-reason">{{ meal.selected.reason }}</div>
+            {% if meal.selected.reason_details %}
+            <div class="meal-reason-details">
+                {% for detail in meal.selected.reason_details %}
+                <div class="meal-reason-detail">{{ detail }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="agent-vote-row">
+                {% for vote in meal.selected.agent_votes %}
+                <div class="agent-vote">
+                    <span>{{ vote.name }}</span>
+                    <strong>{{ vote.score }}</strong>
+                    <small>{{ vote.label }}</small>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if meal.alternatives %}
+            <div class="meal-alt">
+                备选：
+                {% for alt in meal.alternatives %}
+                <a href="{% url 'recipes:detail' pk=alt.recipe.pk %}">{{ alt.recipe.name }}</a>{% if not forloop.last %}、{% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="meal-empty">{{ meal.summary }}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="agent-evidence-grid">
+        {% for agent in plan.agent_cards %}
+        <div class="agent-evidence">
+            <div class="agent-evidence-title">{{ agent.name }}</div>
+            <div class="agent-evidence-role">{{ agent.role }}</div>
+            {% for finding in agent.findings %}
+            <div class="agent-evidence-finding">{{ finding }}</div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="meal-llm-note">
+        {{ plan.llm_status.provider_label }}：{{ plan.llm_status.message }}
+    </div>
+</div>

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}订单详情 - AI菜量菜谱{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-inner">
+        <a href="{% url 'orders:list' %}" class="btn btn-secondary btn-sm">← 返回</a>
+        <span style="font-size:var(--fs-headline);font-weight:600;">订单详情</span>
+        <span></span>
+    </div>
+</div>
+
+<div class="container">
+    <!-- 订单信息 -->
+    <div class="ios-card">
+        <div class="ios-card-body">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-sm);">
+                <span style="font-size:var(--fs-title3);font-weight:700;">{{ order.order_date }}</span>
+                <span class="badge {% if order.source == 'ocr' %}badge-primary{% else %}badge-success{% endif %}">
+                    {{ order.get_source_display }}
+                </span>
+            </div>
+            <div style="color:var(--label-secondary);font-size:var(--fs-footnote);">
+                创建时间: {{ order.created_at|date:"Y-m-d H:i" }}
+            </div>
+        </div>
+    </div>
+
+    <!-- 统计 -->
+    <div class="stat-grid" style="padding:0;">
+        <div class="stat-card">
+            <div class="stat-value">{{ order.total_items }}</div>
+            <div class="stat-label">食材数</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{% if order.total_amount %}¥{{ order.total_amount }}{% else %}-{% endif %}</div>
+            <div class="stat-label">总金额</div>
+        </div>
+    </div>
+
+    <!-- OCR 截图 -->
+    {% if order.ocr_image %}
+    <div class="ios-card" x-data="{ show: false }">
+        <div class="ios-card-header" @click="show=!show" style="cursor:pointer;">
+            📷 OCR 原始截图
+            <span style="color:var(--label-tertiary);" x-text="show ? '收起' : '展开'"></span>
+        </div>
+        <div class="ios-card-body" x-show="show" x-transition>
+            <img src="{{ order.ocr_image.url }}" style="width:100%;border-radius:var(--r-sm);">
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 食材明细 -->
+    <div class="section-title">食材明细</div>
+    <div class="ios-list">
+        {% for item in order.items.all %}
+        <div class="ios-list-item">
+            <div class="ios-list-item-content">
+                <div class="ios-list-item-title">
+                    {{ item.dish_name }}
+                    {% if item.is_matched %}<span class="badge badge-success" style="margin-left:4px;">已匹配</span>{% endif %}
+                </div>
+                <div class="ios-list-item-subtitle">
+                    {{ item.quantity }}份
+                    {% if item.unit_price %}| 单价 ¥{{ item.unit_price }}{% endif %}
+                </div>
+            </div>
+            <div class="ios-list-item-right" style="font-weight:600;">
+                {% if item.subtotal %}¥{{ item.subtotal }}{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if order.note %}
+    <div class="ios-card">
+        <div class="ios-card-header">备注</div>
+        <div class="ios-card-body">{{ order.note }}</div>
+    </div>
+    {% endif %}
+
+    <!-- 删除按钮 -->
+    <div style="padding:var(--sp-xl) var(--sp-md);" x-data="{ showConfirm: false }">
+        <button class="btn btn-danger btn-block btn-sm" @click="showConfirm=true">删除此订单</button>
+        <template x-if="showConfirm">
+            <div>
+                <div class="modal-backdrop show" @click="showConfirm=false"></div>
+                <div class="action-sheet show">
+                    <div class="action-sheet-handle"></div>
+                    <h3 style="font-size:var(--fs-title3);font-weight:600;margin-bottom:var(--sp-sm);">确认删除</h3>
+                    <p style="color:var(--label-secondary);margin-bottom:var(--sp-lg);">删除后无法恢复，关联统计数据会同步回滚。</p>
+                    <form method="post" action="{% url 'orders:delete' pk=order.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-block">确认删除</button>
+                    </form>
+                    <button class="btn btn-secondary btn-block" @click="showConfirm=false" style="margin-top:var(--sp-sm);">取消</button>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>
+{% endblock %}

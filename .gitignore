@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+
+# Django
+db.sqlite3
+*.sqlite3
+media/
+staticfiles/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Runtime artifacts
+.codex-run/
+logs/
+*.log
+*.pid
+*.tmp
+tmp/
+temp/
+
+# External recipe source downloads
+external/CookLikeHOC-main/
+external/CookLikeHOC-main.zip
+external/*.zip
+
+# IDE
+.DS_Store
+.idea/
+.vscode/
+.ace-tool/

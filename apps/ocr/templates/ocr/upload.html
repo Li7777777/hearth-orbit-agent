@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}订单识别 - AI菜量菜谱{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-inner">
+        <div class="page-title">订单识别</div>
+        <div style="display:flex;gap:var(--sp-sm);">
+            <a href="{% url 'ocr:llm_settings' %}" class="btn btn-secondary btn-sm">大模型</a>
+            <a href="{% url 'ocr:vision_settings' %}" class="btn btn-secondary btn-sm">视觉</a>
+        </div>
+    </div>
+</div>
+
+<div class="container" x-data="ocrUpload()">
+    <!-- 上传区域 -->
+    <div class="upload-zone"
+         @click="!isSubmitting && $refs.fileInput.click()"
+         @dragover.prevent="!isSubmitting && (dragover=true)"
+         @dragleave="dragover=false"
+         @drop.prevent="handleDrop($event)"
+         :class="{ dragover: dragover, 'is-busy': isSubmitting }">
+        <input type="file" x-ref="fileInput" accept="image/*" @change="handleFile($event)" class="hidden">
+        <template x-if="!preview">
+            <div>
+                <div class="upload-zone-icon">📷</div>
+                <div class="upload-zone-text">点击上传订单截图</div>
+                <div class="upload-zone-hint">支持 JPG、PNG 格式，可拖拽上传</div>
+            </div>
+        </template>
+        <template x-if="preview">
+            <div>
+                <img :src="preview" style="max-height:300px;margin:0 auto;border-radius:var(--r-sm);">
+                <div class="upload-zone-hint" style="margin-top:var(--sp-sm);">点击重新选择</div>
+            </div>
+        </template>
+    </div>
+
+    <div class="ios-card" style="margin:0 var(--sp-md) var(--sp-md);">
+        <div class="ios-card-body" style="display:flex;align-items:center;justify-content:space-between;gap:var(--sp-md);">
+            <div>
+                <div style="font-size:var(--fs-headline);font-weight:600;">大模型视觉辅助</div>
+                <div style="font-size:var(--fs-footnote);color:var(--label-secondary);margin-top:2px;">
+                    {% if vision_check.ok %}
+                    识别时会按设置自动辅助判断：{{ vision_config.get_provider_display }} / {{ vision_config.model }}
+                    {% else %}
+                    未启用或配置未完整，识别将仅使用 OCR
+                    {% endif %}
+                </div>
+            </div>
+            <span class="badge {% if vision_check.ok %}badge-success{% else %}badge-warning{% endif %}">
+                {% if vision_check.ok %}可用{% else %}待配置{% endif %}
+            </span>
+        </div>
+    </div>
+
+    <!-- 上传按钮 -->
+    <div style="padding:0 var(--sp-md);display:grid;gap:var(--sp-sm);">
+        <form method="post" action="{% url 'ocr:process' %}" enctype="multipart/form-data" x-ref="uploadForm">
+            {% csrf_token %}
+            <input type="file" name="image" x-ref="formFile" class="hidden" accept="image/*">
+            <button type="submit" class="btn btn-primary btn-block" :disabled="!file || isSubmitting" @click.prevent="submitForm()">
+                <span x-show="!isSubmitting">开始识别</span>
+                <span x-show="isSubmitting" x-cloak x-text="`识别中 ${progress}%`"></span>
+            </button>
+        </form>
+    </div>
+
+    <!-- 识别进度 -->
+    <div class="ocr-progress-card" x-show="isSubmitting" x-transition.opacity x-cloak>
+        <div class="ocr-progress-top">
+            <div>
+                <div class="ocr-progress-title" x-text="progressTitle"></div>
+                <div class="ocr-progress-subtitle" x-text="progressHint"></div>
+            </div>
+            <div class="ocr-progress-percent" x-text="`${progress}%`"></div>
+        </div>
+        <div class="ocr-progress-track">
+            <div class="ocr-progress-bar" :style="`width:${progress}%`"></div>
+        </div>
+        <div class="ocr-progress-steps">
+            <div class="ocr-progress-step" :class="stepClass(0)">1. 上传图片</div>
+            <div class="ocr-progress-step" :class="stepClass(1)">2. OCR识别与辅助判断</div>
+            <div class="ocr-progress-step" :class="stepClass(2)">3. 解析并匹配食材</div>
+        </div>
+    </div>
+
+    <!-- 最近识别记录 -->
+    {% if recent_orders %}
+    <div class="section-title">最近识别</div>
+    <div class="ios-list">
+        {% for order in recent_orders %}
+        <a href="{% url 'orders:detail' pk=order.pk %}" class="ios-list-item">
+            <div class="ios-list-item-content">
+                <div class="ios-list-item-title">{{ order.order_date }}</div>
+                <div class="ios-list-item-subtitle">识别食材 {{ order.total_items }} 种</div>
+            </div>
+            <div class="ios-list-item-right">
+                {% if order.total_amount %}¥{{ order.total_amount }}{% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function ocrUpload() {
+    return {
+        file: null,
+        preview: null,
+        dragover: false,
+        isSubmitting: false,
+        visionReady: {{ vision_check.ok|yesno:"true,false" }},
+        progress: 0,
+        progressTitle: '准备识别',
+        progressHint: '',
+        progressTimer: null,
+        handleFile(e) {
+            const f = e.target.files[0];
+            if (f) this.setFile(f);
+        },
+        handleDrop(e) {
+            if (this.isSubmitting) return;
+            this.dragover = false;
+            const f = e.dataTransfer.files[0];
+            if (f) this.setFile(f);
+        },
+        setFile(f) {
+            if (this.isSubmitting) return;
+            if (!f.type.startsWith('image/')) {
+                this.$dispatch('toast', { msg: '请选择图片文件', type: 'error' });
+                return;
+            }
+            if (this.preview) URL.revokeObjectURL(this.preview);
+            this.file = f;
+            this.preview = URL.createObjectURL(f);
+            const dt = new DataTransfer();
+            dt.items.add(f);
+            this.$refs.formFile.files = dt.files;
+        },
+        currentStep() {
+            if (this.progress < 34) return 0;
+            if (this.progress < 78) return 1;
+            return 2;
+        },
+        stepClass(step) {
+            const current = this.currentStep();
+            if (step < current) return 'done';
+            if (step === current) return 'active';
+            return '';
+        },
+        formatFileSize(bytes) {
+            if (!bytes && bytes !== 0) return '';
+            if (bytes < 1024) return `${bytes} B`;
+            const kb = bytes / 1024;
+            if (kb < 1024) return `${kb.toFixed(1)} KB`;
+            return `${(kb / 1024).toFixed(1)} MB`;
+        },
+        startProgress() {
+            this.stopProgress();
+            this.progressTimer = setInterval(() => {
+                if (this.progress < 28) {
+                    this.progress = Math.min(28, this.progress + 3);
+                    this.progressTitle = '正在上传订单截图';
+                    this.progressHint = `${this.file.name} · ${this.formatFileSize(this.file.size)}`;
+                } else if (this.progress < 68) {
+                    this.progress = Math.min(68, this.progress + 2);
+                    this.progressTitle = this.visionReady ? '正在识别文字并辅助判断' : '正在识别文字';
+                    this.progressHint = this.visionReady
+                        ? '系统会在 OCR 不可用或结果较弱时自动调用大模型辅助'
+                        : 'AI 正在提取订单中的商品和价格信息';
+                } else if (this.progress < 92) {
+                    this.progress = Math.min(92, this.progress + 1);
+                    this.progressTitle = '正在解析并匹配食材';
+                    this.progressHint = '正在过滤无用字段并生成可编辑结果';
+                }
+            }, 320);
+        },
+        stopProgress() {
+            if (this.progressTimer) {
+                clearInterval(this.progressTimer);
+                this.progressTimer = null;
+            }
+        },
+        submitForm() {
+            if (!this.file || this.isSubmitting) return;
+            this.isSubmitting = true;
+            this.progress = 8;
+            this.progressTitle = '正在上传订单截图';
+            this.progressHint = `${this.file.name} · ${this.formatFileSize(this.file.size)}`;
+            this.startProgress();
+            this.$nextTick(() => {
+                this.$refs.uploadForm.submit();
+            });
+        }
+    };
+}
+</script>
+{% endblock %}

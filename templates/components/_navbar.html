@@ -1,0 +1,24 @@
+{% load static %}
+<!-- 底部 Tab 导航栏 -->
+<nav class="tab-bar">
+    <a href="{% url 'dashboard:index' %}" class="tab-item {% if request.resolver_match.app_name == 'dashboard' %}active{% endif %}">
+        <span class="tab-icon">🏠</span>
+        <span>首页</span>
+    </a>
+    <a href="{% url 'ocr:upload' %}" class="tab-item {% if request.resolver_match.app_name == 'ocr' %}active{% endif %}">
+        <span class="tab-icon">📷</span>
+        <span>识别</span>
+    </a>
+    <a href="{% url 'dishes:list' %}" class="tab-item {% if request.resolver_match.app_name == 'dishes' %}active{% endif %}">
+        <span class="tab-icon">🍽️</span>
+        <span>食材</span>
+    </a>
+    <a href="{% url 'orders:list' %}" class="tab-item {% if request.resolver_match.app_name == 'orders' %}active{% endif %}">
+        <span class="tab-icon">📋</span>
+        <span>订单</span>
+    </a>
+    <a href="{% url 'recipes:list' %}" class="tab-item {% if request.resolver_match.app_name == 'recipes' %}active{% endif %}">
+        <span class="tab-icon">🍳</span>
+        <span>菜谱</span>
+    </a>
+</nav>

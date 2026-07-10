@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% load widget_tweaks %}
+{% block title %}{{ title }} - AI菜量菜谱{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-inner">
+        <a href="{% url 'dishes:list' %}" class="btn btn-secondary btn-sm">← 返回</a>
+        <span style="font-size:var(--fs-headline);font-weight:600;">{{ title }}</span>
+        <span></span>
+    </div>
+</div>
+
+<div class="container" x-data="dishImageUploader({ recognizeUrl: '{% url 'dishes:recognize_image' %}' })">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        {% if form.errors %}
+        <div style="padding:var(--sp-md) 0;">
+            {% for field, errors in form.errors.items %}
+            {% for error in errors %}
+            <div class="login-error">{{ error }}</div>
+            {% endfor %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {# ── 基本信息 ── #}
+        <div class="section-title">基本信息</div>
+        <div class="ios-form-group">
+            <div class="ios-form-row">
+                <label class="ios-form-label">名称 *</label>
+                {% render_field form.name class="ios-form-input" placeholder="食材名称" %}
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">分类</label>
+                {% render_field form.category class="ios-form-input" %}
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">入库日期</label>
+                {% render_field form.stock_in_date class="ios-form-input" %}
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">单位</label>
+                {% render_field form.unit class="ios-form-input" placeholder="斤" %}
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">规格</label>
+                {% render_field form.specification class="ios-form-input" placeholder="如: 500g/袋" %}
+            </div>
+        </div>
+
+        {# ── 价格与储存 ── #}
+        <div class="section-title">价格与储存</div>
+        <div class="ios-form-group">
+            <div class="ios-form-row">
+                <label class="ios-form-label">参考单价</label>
+                {% render_field form.default_price class="ios-form-input" placeholder="0.00" %}
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">储存方式</label>
+                {% render_field form.storage class="ios-form-input" %}
+            </div>
+        </div>
+
+        {# ── 其他 ── #}
+        <div class="section-title">其他信息</div>
+        <div class="ios-form-group">
+            <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                <label class="ios-form-label" style="width:auto;margin-bottom:var(--sp-sm);">描述</label>
+                {% render_field form.description class="ios-form-input-full" placeholder="食材描述（可选）" rows="2" %}
+            </div>
+            <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                <label class="ios-form-label" style="width:auto;margin-bottom:var(--sp-sm);">图片</label>
+                <div class="media-uploader">
+                    <div class="media-preview" :class="{ 'has-image': previewUrl || existingUrl }">
+                        <template x-if="previewUrl">
+                            <img :src="previewUrl" alt="食材图片预览">
+                        </template>
+                        <template x-if="!previewUrl && existingUrl">
+                            <img :src="existingUrl" alt="当前食材图片">
+                        </template>
+                        <template x-if="!previewUrl && !existingUrl">
+                            <div class="media-preview-empty">
+                                <span class="media-preview-mark">+</span>
+                                <span>添加食材图片</span>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="media-upload-actions">
+                        <button type="button" class="btn btn-primary btn-sm" @click="openCamera(true)" :disabled="isRecognizing">
+                            <span x-show="!isRecognizing">AI拍照识别</span>
+                            <span x-show="isRecognizing" x-cloak>识别中...</span>
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" @click="openCamera(false)" :disabled="isRecognizing">拍照上传</button>
+                        <button type="button" class="btn btn-secondary btn-sm" @click="openLibrary(false)" :disabled="isRecognizing">从相册选择</button>
+                    </div>
+                    <button type="button"
+                            class="btn btn-secondary btn-sm btn-block"
+                            @click="recognizeSelectedImage()"
+                            :disabled="!hasSelectedImage || isRecognizing">
+                        识别当前图片并预填
+                    </button>
+                    <div class="field-caption" x-show="isRecognizing" x-cloak>正在调用大模型识别食材...</div>
+                    <div class="field-caption" x-show="recognitionMessage && !isRecognizing" x-text="recognitionMessage" x-cloak></div>
+                    <div class="field-error" x-show="recognitionError" x-text="recognitionError" x-cloak></div>
+                    <input type="file"
+                           name="{{ form.image.html_name }}"
+                           id="{{ form.image.id_for_label }}"
+                           class="media-upload-input"
+                           accept="image/*"
+                           x-ref="imageInput"
+                           @change="previewImage($event)">
+                    {% if form.image.errors %}
+                    <div class="field-error">{{ form.image.errors|join:", " }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# ── 启用开关 ── #}
+        <div class="ios-form-group">
+            {% include "components/_toggle.html" with name="is_active" checked=form.is_active.value label="启用食材" %}
+        </div>
+
+        <div style="padding:var(--sp-md) 0 var(--sp-xl);">
+            <button type="submit" class="btn btn-primary btn-block">保存</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+function dishImageUploader(options = {}) {
+    return {
+        recognizeUrl: options.recognizeUrl,
+        previewUrl: '',
+        existingUrl: '{% if dish.image %}{{ dish.image.url|escapejs }}{% endif %}',
+        hasSelectedImage: false,
+        pendingRecognition: false,
+        isRecognizing: false,
+        recognitionMessage: '',
+        recognitionError: '',
+        openCamera(shouldRecognize = false) {
+            if (this.isRecognizing) return;
+            this.pendingRecognition = shouldRecognize;
+            const input = this.$refs.imageInput;
+            input.setAttribute('capture', 'environment');
+            input.click();
+        },
+        openLibrary(shouldRecognize = false) {
+            if (this.isRecognizing) return;
+            this.pendingRecognition = shouldRecognize;
+            const input = this.$refs.imageInput;
+            input.removeAttribute('capture');
+            input.click();
+        },
+        previewImage(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) {
+                return;
+            }
+            this.hasSelectedImage = true;
+            this.recognitionMessage = '';
+            this.recognitionError = '';
+            if (this.previewUrl) {
+                URL.revokeObjectURL(this.previewUrl);
+            }
+            this.previewUrl = URL.createObjectURL(file);
+            if (this.pendingRecognition) {
+                this.pendingRecognition = false;
+                this.$nextTick(() => this.recognizeSelectedImage());
+            }
+        },
+        csrfToken() {
+            return document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken') || '';
+        },
+        async recognizeSelectedImage() {
+            const file = this.$refs.imageInput.files && this.$refs.imageInput.files[0];
+            if (!file) {
+                this.recognitionError = '请先拍照或选择食材图片';
+                return;
+            }
+            if (!file.type.startsWith('image/')) {
+                this.recognitionError = '请选择图片文件';
+                return;
+            }
+
+            this.isRecognizing = true;
+            this.recognitionError = '';
+            this.recognitionMessage = '';
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                const response = await fetch(this.recognizeUrl, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': this.csrfToken() },
+                    body: formData,
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || !payload.ok) {
+                    throw new Error(payload.error || 'AI识别失败，请稍后再试');
+                }
+                this.applyRecognizedFields(payload.fields || {});
+                this.recognitionMessage = payload.message || '已识别并预填，可继续修改';
+                this.$dispatch('toast', { msg: 'AI识别已预填，可继续修改', type: 'success' });
+            } catch (error) {
+                this.recognitionError = error.message || 'AI识别失败，请稍后再试';
+                this.$dispatch('toast', { msg: this.recognitionError, type: 'error' });
+            } finally {
+                this.isRecognizing = false;
+            }
+        },
+        applyRecognizedFields(fields) {
+            this.setFieldValue('name', fields.name);
+            if (fields.category_id) {
+                this.setFieldValue('category', fields.category_id);
+            }
+            this.setFieldValue('unit', fields.unit);
+            this.setFieldValue('specification', fields.specification);
+            this.setFieldValue('default_price', fields.default_price);
+            this.setFieldValue('storage', fields.storage);
+            this.setFieldValue('description', fields.description);
+        },
+        setFieldValue(name, value) {
+            if (value === undefined || value === null || value === '') {
+                return;
+            }
+            const field = this.$root.querySelector(`[name="${name}"]`);
+            if (!field) {
+                return;
+            }
+            field.value = value;
+            field.dispatchEvent(new Event('input', { bubbles: true }));
+            field.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+    };
+}
+</script>
+{% endblock %}

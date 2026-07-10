@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}{{ dish.name }} - AI菜量菜谱{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-inner">
+        <a href="{% url 'dishes:list' %}" class="btn btn-secondary btn-sm">← 返回</a>
+        <span style="font-size:var(--fs-headline);font-weight:600;">食材详情</span>
+        <a href="{% url 'dishes:edit' pk=dish.pk %}" class="btn btn-secondary btn-sm">编辑</a>
+    </div>
+</div>
+
+<div class="container">
+    {# ── 头部卡片 ── #}
+    <div class="ios-card">
+        {% if dish.image %}
+        <img src="{{ dish.image.url }}" style="width:100%;max-height:200px;object-fit:cover;border-radius:var(--r-md) var(--r-md) 0 0;">
+        {% endif %}
+        <div class="ios-card-body">
+            <div style="display:flex;align-items:center;gap:var(--sp-md);">
+                {% if not dish.image %}
+                <div style="width:64px;height:64px;border-radius:var(--r-md);background:var(--bg-primary);display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;">
+                    {% if dish.category %}{{ dish.category.icon }}{% else %}🥗{% endif %}
+                </div>
+                {% endif %}
+                <div style="flex:1;">
+                    <h2 style="font-size:var(--fs-title2);font-weight:700;">{{ dish.name }}</h2>
+                    <div style="display:flex;flex-wrap:wrap;gap:var(--sp-xs);margin-top:4px;">
+                        {% if dish.category %}<span class="tag">{{ dish.category.icon }} {{ dish.category.name }}</span>{% endif %}
+                        <span class="badge {% if dish.is_active %}badge-success{% else %}badge-danger{% endif %}">
+                            {% if dish.is_active %}启用中{% else %}已停用{% endif %}
+                        </span>
+                        {% if not dish.is_active and dish.deactivation_reason %}
+                        <span class="tag">原因：{{ dish.get_deactivation_reason_display }}</span>
+                        {% endif %}
+                        {% if not dish.is_active and dish.deactivated_at %}
+                        <span class="tag">停用于 {{ dish.deactivated_at }}</span>
+                        {% endif %}
+                        <span class="tag">{{ dish.get_storage_display }}</span>
+                        <span class="tag">入库 {{ dish.stock_in_date }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── 属性信息 ── #}
+    <div class="stat-grid" style="padding:0;grid-template-columns:1fr 1fr;">
+        <div class="stat-card">
+            <div class="stat-value">{{ dish.total_ordered|floatformat:-2 }}</div>
+            <div class="stat-label">累计用量({{ dish.unit }})</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{% if dish.default_price %}¥{{ dish.default_price }}{% else %}-{% endif %}</div>
+            <div class="stat-label">单价/{{ dish.unit }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ dish.get_storage_display }}</div>
+            <div class="stat-label">储存方式</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ dish.days_in_stock }}</div>
+            <div class="stat-label">已买入天数</div>
+        </div>
+    </div>
+
+    {# ── 规格与描述 ── #}
+    {% if dish.specification or dish.description %}
+    <div class="ios-card">
+        {% if dish.specification %}
+        <div class="ios-card-body" style="border-bottom:0.5px solid var(--separator-light);">
+            <div style="font-size:var(--fs-footnote);color:var(--label-secondary);margin-bottom:2px;">规格</div>
+            <div>{{ dish.specification }}</div>
+        </div>
+        {% endif %}
+        {% if dish.description %}
+        <div class="ios-card-body">
+            <div style="font-size:var(--fs-footnote);color:var(--label-secondary);margin-bottom:2px;">描述</div>
+            <div style="color:var(--label-secondary);line-height:1.5;">{{ dish.description }}</div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# ── 近期使用记录 ── #}
+    <div class="section-title">近期使用记录</div>
+    {% if recent_items %}
+    <div class="ios-list">
+        {% for item in recent_items %}
+        <a href="{% url 'orders:detail' pk=item.order.pk %}" class="ios-list-item">
+            <div class="ios-list-item-content">
+                <div class="ios-list-item-title">{{ item.order.order_date }}</div>
+                <div class="ios-list-item-subtitle">{{ item.quantity }}{{ dish.unit }} {% if item.subtotal %}| ¥{{ item.subtotal }}{% endif %}</div>
+            </div>
+            <div class="ios-list-item-right">{{ item.order.source }}</div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    {% include "components/_empty_state.html" with icon="📋" title="暂无使用记录" desc="" %}
+    {% endif %}
+
+    {# ── 停用操作 ── #}
+    {% if dish.is_active %}
+    <div style="padding:var(--sp-xl) var(--sp-md);display:grid;gap:var(--sp-sm);">
+        <form method="post" action="{% url 'dishes:mark_eaten' pk=dish.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success btn-block btn-sm">吃完了</button>
+        </form>
+        <form method="post" action="{% url 'dishes:mark_discarded' pk=dish.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger btn-block btn-sm">丢掉了</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

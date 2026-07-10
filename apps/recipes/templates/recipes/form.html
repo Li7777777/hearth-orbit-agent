@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% load widget_tweaks %}
+{% block title %}{{ title }} - AI菜量菜谱{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-inner">
+        <a href="{% url 'recipes:list' %}" class="btn btn-secondary btn-sm">← 返回</a>
+        <span style="font-size:var(--fs-headline);font-weight:600;">{{ title }}</span>
+        <span></span>
+    </div>
+</div>
+
+<div class="container" x-data="recipeForm({
+    mediaType: '{{ form.media_type.value|default:"none"|escapejs }}'
+})">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        {% if form.errors %}
+        <div style="padding:var(--sp-md) 0;">
+            {% for field, errors in form.errors.items %}
+            {% for error in errors %}
+            <div class="login-error">{{ error }}</div>
+            {% endfor %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {# ── 基本信息 ── #}
+        <div class="section-title">基本信息</div>
+        <div class="ios-form-group">
+            <div class="ios-form-row">
+                <label class="ios-form-label">名称 *</label>
+                {% render_field form.name class="ios-form-input" placeholder="菜谱名称" %}
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">分类</label>
+                {% render_field form.category class="ios-form-input" %}
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">关联食材</label>
+                {% render_field form.dish class="ios-form-input" %}
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">难度</label>
+                {% render_field form.difficulty class="ios-form-input" %}
+            </div>
+        </div>
+
+        {# ── 时间与份数 ── #}
+        <div class="section-title">时间与份数</div>
+        <div class="ios-form-group">
+            <div class="ios-form-row">
+                <label class="ios-form-label">份数</label>
+                {% render_field form.servings class="ios-form-input" placeholder="1" min="1" %}
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">准备时间</label>
+                {% render_field form.prep_time_minutes class="ios-form-input" placeholder="分钟" min="0" %}
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">烹饪时间</label>
+                {% render_field form.cook_time_minutes class="ios-form-input" placeholder="分钟" min="0" %}
+            </div>
+        </div>
+
+        {# ── 用料（主料） ── #}
+        <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;padding-right:var(--sp-md);">
+            <span>主料</span>
+            <button type="button" class="btn btn-primary btn-pill" @click="addIngredient(true)">+ 添加</button>
+        </div>
+        <div class="ios-form-group" style="padding:0;" x-show="mainIngredients.length > 0">
+            <template x-for="(ing, idx) in mainIngredients" :key="'main-'+idx">
+                <div class="ios-form-row" style="gap:var(--sp-sm);padding:8px var(--sp-md);">
+                    <input type="hidden" name="ingredient_is_main[]" value="1">
+                    <input type="text" name="ingredient_name[]" class="ios-form-input-full"
+                           placeholder="食材名称" x-model="ing.name"
+                           style="flex:2;padding:8px 12px;font-size:var(--fs-subhead);">
+                    <input type="text" name="ingredient_amount[]" class="ios-form-input-full"
+                           placeholder="用量" x-model="ing.amount"
+                           style="flex:1;padding:8px 12px;font-size:var(--fs-subhead);">
+                    <button type="button" @click="removeIngredient(true, idx)"
+                            style="color:var(--danger);background:none;border:none;font-size:20px;cursor:pointer;padding:4px;flex-shrink:0;">✕</button>
+                </div>
+            </template>
+        </div>
+        <div x-show="mainIngredients.length === 0" style="padding:var(--sp-md);text-align:center;color:var(--label-tertiary);font-size:var(--fs-subhead);">
+            点击"+ 添加"按钮添加主料
+        </div>
+
+        {# ── 用料（辅料） ── #}
+        <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;padding-right:var(--sp-md);">
+            <span>辅料</span>
+            <button type="button" class="btn btn-primary btn-pill" @click="addIngredient(false)">+ 添加</button>
+        </div>
+        <div class="ios-form-group" style="padding:0;" x-show="subIngredients.length > 0">
+            <template x-for="(ing, idx) in subIngredients" :key="'sub-'+idx">
+                <div class="ios-form-row" style="gap:var(--sp-sm);padding:8px var(--sp-md);">
+                    <input type="hidden" name="ingredient_is_main[]" value="0">
+                    <input type="text" name="ingredient_name[]" class="ios-form-input-full"
+                           placeholder="辅料名称" x-model="ing.name"
+                           style="flex:2;padding:8px 12px;font-size:var(--fs-subhead);">
+                    <input type="text" name="ingredient_amount[]" class="ios-form-input-full"
+                           placeholder="用量" x-model="ing.amount"
+                           style="flex:1;padding:8px 12px;font-size:var(--fs-subhead);">
+                    <button type="button" @click="removeIngredient(false, idx)"
+                            style="color:var(--danger);background:none;border:none;font-size:20px;cursor:pointer;padding:4px;flex-shrink:0;">✕</button>
+                </div>
+            </template>
+        </div>
+        <div x-show="subIngredients.length === 0" style="padding:var(--sp-md);text-align:center;color:var(--label-tertiary);font-size:var(--fs-subhead);">
+            点击"+ 添加"按钮添加辅料
+        </div>
+
+        {# ── 做法步骤 ── #}
+        <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;padding-right:var(--sp-md);">
+            <span>做法步骤</span>
+            <button type="button" class="btn btn-primary btn-pill" @click="addStep()">+ 添加</button>
+        </div>
+        <template x-for="(step, idx) in steps" :key="'step-'+idx">
+            <div class="ios-card" style="margin:0 var(--sp-md) var(--sp-sm);">
+                <div class="ios-card-body" style="display:flex;gap:var(--sp-sm);align-items:flex-start;">
+                    <div style="width:28px;height:28px;border-radius:50%;background:var(--system-blue,var(--primary));color:#fff;display:flex;align-items:center;justify-content:center;font-size:var(--fs-subhead);font-weight:700;flex-shrink:0;margin-top:2px;"
+                         x-text="idx+1"></div>
+                    <div style="flex:1;">
+                        <textarea name="step_desc[]" class="ios-form-input-full"
+                                  placeholder="描述这一步的做法..."
+                                  x-model="step.description"
+                                  rows="2" style="min-height:60px;"></textarea>
+                    </div>
+                    <button type="button" @click="removeStep(idx)"
+                            style="color:var(--danger);background:none;border:none;font-size:20px;cursor:pointer;padding:4px;flex-shrink:0;margin-top:2px;">✕</button>
+                </div>
+            </div>
+        </template>
+        <div x-show="steps.length === 0" style="padding:var(--sp-md);text-align:center;color:var(--label-tertiary);font-size:var(--fs-subhead);">
+            点击"+ 添加"按钮添加做法步骤
+        </div>
+
+        {# ── 其他信息 ── #}
+        <div class="section-title">其他信息</div>
+        <div class="ios-form-group">
+            <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                <label class="ios-form-label" style="width:auto;margin-bottom:var(--sp-sm);">简介</label>
+                {% render_field form.description class="ios-form-input-full" placeholder="简单介绍这道菜..." rows="3" %}
+            </div>
+            <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                <label class="ios-form-label" style="width:auto;margin-bottom:var(--sp-sm);">成品图片</label>
+                {% if recipe.image %}
+                <div style="margin-bottom:var(--sp-sm);">
+                    <img src="{{ recipe.image.url }}" style="max-height:120px;border-radius:var(--r-sm);object-fit:cover;">
+                </div>
+                {% endif %}
+                {% render_field form.image class="ios-form-input-full" %}
+            </div>
+            <div class="ios-form-row" style="flex-direction:column;align-items:stretch;gap:var(--sp-sm);">
+                <label class="ios-form-label" style="width:auto;">媒体源</label>
+                <div class="media-source-grid">
+                    <div>
+                        <div class="field-caption">类型</div>
+                        <select name="{{ form.media_type.html_name }}"
+                                id="{{ form.media_type.id_for_label }}"
+                                class="ios-form-input-full"
+                                x-model="mediaType">
+                            {% for value, label in form.fields.media_type.choices %}
+                            <option value="{{ value }}" {% if form.media_type.value == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div x-show="mediaType !== 'none'" x-cloak>
+                        <div class="field-caption">标题</div>
+                        {% render_field form.media_title class="ios-form-input-full" placeholder="如教程视频或参考图片" %}
+                    </div>
+                </div>
+                <div x-show="mediaType !== 'none'" x-cloak>
+                    <div class="field-caption">链接</div>
+                    {% render_field form.media_url class="ios-form-input-full" placeholder="https://example.com/media" %}
+                </div>
+                {% if form.media_url.errors %}
+                <div class="field-error">{{ form.media_url.errors|join:", " }}</div>
+                {% endif %}
+            </div>
+            <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                <label class="ios-form-label" style="width:auto;margin-bottom:var(--sp-sm);">小贴士</label>
+                {% render_field form.tips class="ios-form-input-full" placeholder="小贴士（可选）" rows="2" %}
+            </div>
+        </div>
+
+        {# ── 发布开关 ── #}
+        <div class="ios-form-group">
+            {% include "components/_toggle.html" with name="is_published" checked=form.is_published.value label="发布菜谱" %}
+        </div>
+
+        {# ── 提交按钮 ── #}
+        <div style="padding:var(--sp-md) 0 var(--sp-xl);">
+            <button type="submit" class="btn btn-primary btn-block">保存菜谱</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function recipeForm(initial = {}) {
+    // 编辑模式：从后端传入的 JSON 数据初始化
+    const initIngredients = {{ ingredients_json|default:"[]"|safe }};
+    const initSteps = {{ steps_json|default:"[]"|safe }};
+
+    const mainIng = initIngredients.filter(i => i.is_main);
+    const subIng = initIngredients.filter(i => !i.is_main);
+    const stepList = initSteps.map(s => ({ description: s.description }));
+
+    return {
+        mediaType: initial.mediaType || 'none',
+        mainIngredients: mainIng.length ? mainIng : [],
+        subIngredients: subIng.length ? subIng : [],
+        steps: stepList.length ? stepList : [],
+
+        addIngredient(isMain) {
+            const list = isMain ? this.mainIngredients : this.subIngredients;
+            list.push({ name: '', amount: '', is_main: isMain });
+        },
+
+        removeIngredient(isMain, idx) {
+            if (isMain) {
+                this.mainIngredients.splice(idx, 1);
+            } else {
+                this.subIngredients.splice(idx, 1);
+            }
+        },
+
+        addStep() {
+            this.steps.push({ description: '' });
+        },
+
+        removeStep(idx) {
+            this.steps.splice(idx, 1);
+        }
+    };
+}
+</script>
+{% endblock %}

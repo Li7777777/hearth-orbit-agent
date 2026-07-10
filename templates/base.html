@@ -1,0 +1,45 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>{% block title %}AI菜量菜谱{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body x-data="{ toast: { show: false, msg: '', type: 'success' } }">
+
+    <!-- Toast 通知 -->
+    <div class="toast-container" x-show="toast.show" x-cloak
+         x-transition:enter="toastIn"
+         @toast.window="toast.msg=$event.detail.msg; toast.type=$event.detail.type||'success'; toast.show=true; setTimeout(()=>toast.show=false, 2500)">
+        <div class="toast" :class="'toast-'+toast.type">
+            <span x-text="toast.msg"></span>
+        </div>
+    </div>
+
+    {% block content %}{% endblock %}
+
+    <!-- 底部导航栏 (仅登录后显示) -->
+    {% if request.user.is_authenticated %}
+    {% include "components/_navbar.html" %}
+    {% endif %}
+
+    <script src="{% static 'js/app.js' %}"></script>
+    {% if messages %}
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        {% for message in messages %}
+        showToast('{{ message|escapejs }}', '{{ message.tags|default:"info" }}');
+        {% endfor %}
+    });
+    </script>
+    {% endif %}
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

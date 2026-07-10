@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}{{ recipe.name }} - AI菜量菜谱{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-inner">
+        <a href="{% url 'recipes:list' %}" class="btn btn-secondary btn-sm">← 返回</a>
+        <span style="font-size:var(--fs-headline);font-weight:600;">菜谱详情</span>
+        <a href="{% url 'recipes:edit' pk=recipe.pk %}" class="btn btn-secondary btn-sm">编辑</a>
+    </div>
+</div>
+
+<div class="container" id="recipe-detail-container">
+    {{ linked_recipe_previews|json_script:"linked-recipe-previews" }}
+    {# 头部卡片：图片 + 基本信息 #}
+    <div class="ios-card">
+        {% if recipe.display_image_url %}
+        <img src="{{ recipe.display_image_url }}" alt="{{ recipe.display_image_alt }}" style="width:100%;max-height:240px;object-fit:cover;border-radius:var(--r-lg) var(--r-lg) 0 0;">
+        {% endif %}
+        <div class="ios-card-body">
+            <h2 style="font-size:var(--fs-title2);font-weight:700;margin-bottom:var(--sp-xs);">{{ recipe.name }}</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:var(--sp-sm);margin-bottom:var(--sp-sm);">
+                {% if recipe.category %}
+                <span class="tag">{{ recipe.category.icon }} {{ recipe.category.name }}</span>
+                {% endif %}
+                <span class="badge badge-primary">{{ recipe.difficulty }}</span>
+                {% if recipe.source != 'local' %}
+                <span class="tag">🌐 外部源</span>
+                {% endif %}
+                {% if recipe.has_external_media %}
+                <span class="tag">{{ recipe.media_display_label }}</span>
+                {% endif %}
+                {% if recipe.dish %}
+                <span class="tag">🔗 {{ recipe.dish.name }}</span>
+                {% endif %}
+            </div>
+            {% if recipe.description %}
+            <p style="color:var(--label-secondary);font-size:var(--fs-subhead);line-height:1.5;">{{ recipe_description_html }}</p>
+            {% endif %}
+            {% if recipe.source_url %}
+            <p style="margin-top:var(--sp-xs);font-size:var(--fs-footnote);">
+                <a href="{{ recipe.source_url }}" target="_blank" rel="noopener noreferrer">查看来源仓库</a>
+            </p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if recipe.has_external_media %}
+    <div class="section-title">媒体源</div>
+    <div class="ios-card media-source-card">
+        {% if recipe.is_image_media %}
+        <a href="{{ recipe.media_url }}" target="_blank" rel="noopener noreferrer" class="external-media-image">
+            <img src="{{ recipe.media_url }}" alt="{{ recipe.media_title|default:recipe.name }}">
+        </a>
+        {% endif %}
+        <div class="ios-card-body">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-md);">
+                <div style="min-width:0;">
+                    <div style="font-size:var(--fs-headline);font-weight:600;">
+                        {{ recipe.media_title|default:recipe.media_display_label }}
+                    </div>
+                    <div class="media-source-url">{{ recipe.media_url }}</div>
+                </div>
+                {% if recipe.is_video_media %}
+                <a href="{{ recipe.media_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">
+                    打开视频
+                </a>
+                {% else %}
+                <a href="{{ recipe.media_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">
+                    打开图片
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {# 统计信息 #}
+    <div class="stat-grid" style="padding:0;">
+        <div class="stat-card">
+            <div class="stat-value">{{ recipe.servings }}份</div>
+            <div class="stat-label">份量</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{% if recipe.prep_time_minutes %}{{ recipe.prep_time_minutes }}{% else %}-{% endif %}</div>
+            <div class="stat-label">准备(分钟)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{% if recipe.cook_time_minutes %}{{ recipe.cook_time_minutes }}{% else %}-{% endif %}</div>
+            <div class="stat-label">烹饪(分钟)</div>
+        </div>
+    </div>
+
+    {# 主料 #}
+    {% if main_ingredients %}
+    <div class="section-title">主料</div>
+    <div class="ios-list">
+        {% for ing in main_ingredients %}
+        <div class="ios-list-item">
+            <div class="ios-list-item-content">
+                <div class="ios-list-item-title" style="display:flex;align-items:center;gap:6px;">
+                    {% if ing.is_dish_matched %}
+                    <span class="ingredient-match-ok" title="已匹配食材：{{ ing.matched_dish_name }}">✓</span>
+                    {% endif %}
+                    <span>{{ ing.name_html }}</span>
+                </div>
+            </div>
+            <div class="ios-list-item-right" style="color:var(--label-secondary);">{{ ing.amount }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# 辅料 #}
+    {% if sub_ingredients %}
+    <div class="section-title">辅料</div>
+    <div class="ios-list">
+        {% for ing in sub_ingredients %}
+        <div class="ios-list-item">
+            <div class="ios-list-item-content">
+                <div class="ios-list-item-title" style="display:flex;align-items:center;gap:6px;">
+                    {% if ing.is_dish_matched %}
+                    <span class="ingredient-match-ok" title="已匹配食材：{{ ing.matched_dish_name }}">✓</span>
+                    {% endif %}
+                    <span>{{ ing.name_html }}</span>
+                </div>
+            </div>
+            <div class="ios-list-item-right" style="color:var(--label-secondary);">{{ ing.amount }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# 没有任何食材 #}
+    {% if not main_ingredients and not sub_ingredients %}
+    <div class="section-title">用料</div>
+    {% include "components/_empty_state.html" with icon="🧂" title="暂无用料" desc="编辑菜谱添加食材" %}
+    {% endif %}
+
+    {# 做法步骤 #}
+    <div class="section-title">做法步骤</div>
+    {% if steps %}
+    <div style="padding:0 var(--sp-md);">
+        {% for step in steps %}
+        <div class="ios-card" style="margin-bottom:var(--sp-sm);">
+            <div class="ios-card-body" style="display:flex;gap:var(--sp-md);">
+                <div style="width:28px;height:28px;border-radius:50%;background:var(--system-blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:var(--fs-subhead);font-weight:700;flex-shrink:0;">{{ step.step_number }}</div>
+                <div style="flex:1;font-size:var(--fs-body);line-height:1.6;">{{ step.description_html }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    {% include "components/_empty_state.html" with icon="📝" title="暂无步骤" desc="编辑菜谱添加做法" %}
+    {% endif %}
+
+    {# 小贴士 #}
+    {% if recipe.tips %}
+    <div class="section-title">小贴士</div>
+    <div class="ios-card">
+        <div class="ios-card-body" style="color:var(--label-secondary);font-size:var(--fs-subhead);line-height:1.6;">
+            💡 {{ recipe.tips }}
+        </div>
+    </div>
+    {% endif %}
+
+    <div id="linkedRecipePreview" hidden>
+        <div class="modal-backdrop show" data-preview-close></div>
+        <div class="action-sheet show recipe-preview-sheet" role="dialog" aria-modal="true" aria-labelledby="linkedRecipeTitle">
+            <div class="action-sheet-handle"></div>
+            <img id="linkedRecipeImage" class="recipe-preview-image" alt="" hidden>
+            <div class="recipe-preview-content">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-md);">
+                    <div style="min-width:0;">
+                        <h3 id="linkedRecipeTitle" class="recipe-preview-title"></h3>
+                        <div id="linkedRecipeMeta" class="recipe-preview-meta" hidden></div>
+                    </div>
+                    <button type="button" class="recipe-preview-close" data-preview-close aria-label="关闭">×</button>
+                </div>
+                <p id="linkedRecipeDesc" class="recipe-preview-desc" hidden></p>
+                <div id="linkedRecipeIngredients" class="recipe-preview-ingredients" hidden></div>
+                <div class="recipe-preview-actions">
+                    <a id="linkedRecipeDetailUrl" class="btn btn-primary btn-block" href="#">查看完整菜谱</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# 删除按钮 #}
+    <div style="padding:var(--sp-xl) var(--sp-md);" x-data="{ showConfirm: false }">
+        <button class="btn btn-danger btn-block btn-sm" @click="showConfirm=true">删除此菜谱</button>
+        <template x-if="showConfirm">
+            <div>
+                <div class="modal-backdrop show" @click="showConfirm=false"></div>
+                <div class="action-sheet show">
+                    <div class="action-sheet-handle"></div>
+                    <h3 style="font-size:var(--fs-title3);font-weight:600;margin-bottom:var(--sp-sm);">确认删除</h3>
+                    <p style="color:var(--label-secondary);margin-bottom:var(--sp-lg);">删除后无法恢复，包括所有用料和步骤。</p>
+                    <form method="post" action="{% url 'recipes:delete' pk=recipe.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-block">确认删除</button>
+                    </form>
+                    <button class="btn btn-secondary btn-block" @click="showConfirm=false" style="margin-top:var(--sp-sm);">取消</button>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+function initRecipeDetailPreview() {
+    const root = document.getElementById('recipe-detail-container');
+    const data = document.getElementById('linked-recipe-previews');
+    const modal = document.getElementById('linkedRecipePreview');
+    if (!root || !data || !modal || modal.dataset.initialized === '1') {
+        return;
+    }
+
+    let previews = {};
+    try {
+        previews = JSON.parse(data.textContent || '{}');
+    } catch (_) {
+        previews = {};
+    }
+
+    const image = document.getElementById('linkedRecipeImage');
+    const title = document.getElementById('linkedRecipeTitle');
+    const meta = document.getElementById('linkedRecipeMeta');
+    const desc = document.getElementById('linkedRecipeDesc');
+    const ingredients = document.getElementById('linkedRecipeIngredients');
+    const detailUrl = document.getElementById('linkedRecipeDetailUrl');
+
+    function setText(element, value) {
+        if (!element) return;
+        element.textContent = value || '';
+        element.hidden = !value;
+    }
+
+    function openPreview(preview) {
+        if (!preview) return;
+        if (image) {
+            if (preview.image_url) {
+                image.src = preview.image_url;
+                image.alt = preview.image_alt || preview.name || '';
+                image.hidden = false;
+            } else {
+                image.removeAttribute('src');
+                image.hidden = true;
+            }
+        }
+        setText(title, preview.name || '');
+        setText(meta, `${preview.category_icon || ''} ${preview.category || ''}`.trim());
+        setText(desc, preview.description || '');
+        if (ingredients) {
+            ingredients.innerHTML = '';
+            (preview.ingredients || []).forEach((name) => {
+                const chip = document.createElement('span');
+                chip.className = 'tag';
+                chip.textContent = name;
+                ingredients.appendChild(chip);
+            });
+            ingredients.hidden = !(preview.ingredients && preview.ingredients.length);
+        }
+        if (detailUrl) {
+            detailUrl.href = preview.detail_url || '#';
+        }
+        modal.hidden = false;
+        document.body.classList.add('modal-open');
+    }
+
+    function closePreview() {
+        modal.hidden = true;
+        document.body.classList.remove('modal-open');
+    }
+
+    root.addEventListener('click', (event) => {
+        const trigger = event.target.closest('.recipe-inline-link');
+        if (!trigger || !root.contains(trigger)) {
+            return;
+        }
+        openPreview(previews[trigger.dataset.recipeLinkKey]);
+    });
+
+    modal.querySelectorAll('[data-preview-close]').forEach((button) => {
+        button.addEventListener('click', closePreview);
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !modal.hidden) {
+            closePreview();
+        }
+    });
+    modal.dataset.initialized = '1';
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRecipeDetailPreview);
+} else {
+    initRecipeDetailPreview();
+}
+</script>
+{% endblock %}

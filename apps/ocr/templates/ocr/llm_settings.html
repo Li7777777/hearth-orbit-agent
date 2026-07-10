@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}大模型配置 - AI菜量菜谱{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-inner">
+        <a href="{% url 'ocr:upload' %}" class="btn btn-secondary btn-sm">返回</a>
+        <span style="font-size:var(--fs-headline);font-weight:600;">大模型配置</span>
+        <a href="{% url 'ocr:vision_settings' %}" class="btn btn-secondary btn-sm">视觉</a>
+    </div>
+</div>
+
+<div class="container">
+    <div class="ios-card" style="margin:var(--sp-md);">
+        <div class="ios-card-body" style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-md);">
+            <div>
+                <div style="font-size:var(--fs-headline);font-weight:600;">多模型调度</div>
+                <div style="font-size:var(--fs-footnote);color:var(--label-secondary);margin-top:2px;">
+                    启用且配置完整的模型会按优先级从小到大参与三餐大模型调度
+                </div>
+            </div>
+            <span class="badge {% if active_complete_count %}badge-success{% else %}badge-warning{% endif %}">
+                可用 {{ active_complete_count }}
+            </span>
+        </div>
+    </div>
+
+    {% if config_cards %}
+    <div class="section-title">已配置模型</div>
+    {% for card in config_cards %}
+    {% with config=card.config check_messages=card.check_messages %}
+    <form method="post" action="{% url 'ocr:llm_settings' %}" class="ios-card" style="margin:0 var(--sp-md) var(--sp-md);">
+        {% csrf_token %}
+        <input type="hidden" name="config_id" value="{{ config.id }}">
+        <div class="ios-card-header">
+            <span>{{ config.display_label }}</span>
+            <span class="badge {% if config.enabled and not check_messages %}badge-success{% elif config.enabled %}badge-warning{% else %}badge-primary{% endif %}">
+                {% if config.enabled and not check_messages %}可用{% elif config.enabled %}待补全{% else %}停用{% endif %}
+            </span>
+        </div>
+        <div class="ios-card-body" style="display:grid;gap:var(--sp-sm);">
+            {% include "components/_toggle.html" with name="enabled" checked=config.enabled label="启用模型" %}
+            <div class="ios-form-row">
+                <label class="ios-form-label">名称</label>
+                <input type="text" class="ios-form-input" name="name" value="{{ config.name }}">
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">服务商</label>
+                <input type="text" class="ios-form-input" name="provider_name" value="{{ config.provider_name }}" placeholder="DeepSeek">
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">模型</label>
+                <input type="text" class="ios-form-input" name="model" value="{{ config.model }}" placeholder="DeepSeek-V4-Flash-think">
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">Base URL</label>
+                <input type="url" class="ios-form-input" name="base_url" value="{{ config.base_url }}" placeholder="https://api.example.com/v1">
+            </div>
+            <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                <label class="ios-form-label" style="width:auto;margin-bottom:var(--sp-sm);">API Key</label>
+                <input type="password" class="ios-form-input-full" name="api_key" autocomplete="off"
+                       placeholder="{% if config.masked_api_key %}已保存 {{ config.masked_api_key }}，留空则保持不变{% else %}粘贴 API Key{% endif %}">
+            </div>
+            {% if config.has_api_key %}
+            {% include "components/_toggle.html" with name="clear_api_key" checked=False label="清空已保存 API Key" %}
+            {% endif %}
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-sm);">
+                <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                    <label class="ios-form-label" style="width:auto;">优先级</label>
+                    <input type="number" class="ios-form-input-full" name="priority" value="{{ config.priority }}" min="1" step="1">
+                </div>
+                <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                    <label class="ios-form-label" style="width:auto;">RPM</label>
+                    <input type="number" class="ios-form-input-full" name="requests_per_minute" value="{{ config.requests_per_minute }}" min="1" step="1">
+                </div>
+                <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                    <label class="ios-form-label" style="width:auto;">超时</label>
+                    <input type="number" class="ios-form-input-full" name="timeout_seconds" value="{{ config.timeout_seconds }}" min="5" step="1">
+                </div>
+                <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                    <label class="ios-form-label" style="width:auto;">最大并发</label>
+                    <input type="number" class="ios-form-input-full" name="max_concurrency" value="{{ config.max_concurrency }}" min="1" step="1">
+                </div>
+                <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                    <label class="ios-form-label" style="width:auto;">专家并发</label>
+                    <input type="number" class="ios-form-input-full" name="expert_concurrency" value="{{ config.expert_concurrency }}" min="1" max="3" step="1">
+                </div>
+            </div>
+            <textarea class="ios-form-input-full" name="notes" rows="2" placeholder="备注">{{ config.notes }}</textarea>
+            {% if check_messages %}
+            <div class="ios-list" style="margin:0;">
+                {% for message in check_messages %}
+                <div class="ios-list-item">
+                    <div class="ios-list-item-content">
+                        <div class="ios-list-item-subtitle">{{ message }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-sm);">
+                <button type="submit" name="action" value="save" class="btn btn-primary btn-block">保存</button>
+                <button type="submit" name="action" value="delete" class="btn btn-danger btn-block"
+                        onclick="return confirm('删除这个大模型配置？')">删除</button>
+            </div>
+        </div>
+    </form>
+    {% endwith %}
+    {% endfor %}
+    {% endif %}
+
+    <div class="section-title">新增模型</div>
+    <form method="post" action="{% url 'ocr:llm_settings' %}" class="ios-card" style="margin:0 var(--sp-md) var(--sp-md);">
+        {% csrf_token %}
+        <div class="ios-card-body" style="display:grid;gap:var(--sp-sm);">
+            {% include "components/_toggle.html" with name="enabled" checked=True label="启用模型" %}
+            <div class="ios-form-row">
+                <label class="ios-form-label">名称</label>
+                <input type="text" class="ios-form-input" name="name" placeholder="DeepSeek Flash">
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">服务商</label>
+                <input type="text" class="ios-form-input" name="provider_name" placeholder="DeepSeek">
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">模型</label>
+                <input type="text" class="ios-form-input" name="model" placeholder="DeepSeek-V4-Flash-think">
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">Base URL</label>
+                <input type="url" class="ios-form-input" name="base_url" placeholder="https://api.example.com/v1">
+            </div>
+            <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                <label class="ios-form-label" style="width:auto;margin-bottom:var(--sp-sm);">API Key</label>
+                <input type="password" class="ios-form-input-full" name="api_key" autocomplete="off" placeholder="粘贴 API Key">
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-sm);">
+                <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                    <label class="ios-form-label" style="width:auto;">优先级</label>
+                    <input type="number" class="ios-form-input-full" name="priority" value="10" min="1" step="1">
+                </div>
+                <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                    <label class="ios-form-label" style="width:auto;">RPM</label>
+                    <input type="number" class="ios-form-input-full" name="requests_per_minute" value="5" min="1" step="1">
+                </div>
+                <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                    <label class="ios-form-label" style="width:auto;">超时</label>
+                    <input type="number" class="ios-form-input-full" name="timeout_seconds" value="60" min="5" step="1">
+                </div>
+                <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                    <label class="ios-form-label" style="width:auto;">最大并发</label>
+                    <input type="number" class="ios-form-input-full" name="max_concurrency" value="3" min="1" step="1">
+                </div>
+                <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                    <label class="ios-form-label" style="width:auto;">专家并发</label>
+                    <input type="number" class="ios-form-input-full" name="expert_concurrency" value="3" min="1" max="3" step="1">
+                </div>
+            </div>
+            <textarea class="ios-form-input-full" name="notes" rows="2" placeholder="备注"></textarea>
+            <button type="submit" name="action" value="create" class="btn btn-primary btn-block">新增配置</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

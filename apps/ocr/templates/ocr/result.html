@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}识别结果 - AI菜量菜谱{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-inner">
+        <a href="{% url 'ocr:upload' %}" class="btn btn-secondary btn-sm">← 返回</a>
+        <span style="font-size:var(--fs-headline);font-weight:600;">识别结果</span>
+        <span></span>
+    </div>
+</div>
+
+<div class="container" x-data="ocrResult()">
+    <!-- 截图缩略图 -->
+    {% if image_url %}
+    <div class="image-preview" @click="showImage=!showImage">
+        <img src="{{ image_url }}" :style="showImage ? '' : 'max-height:120px;object-fit:cover;'" alt="订单截图">
+    </div>
+    {% endif %}
+
+    <!-- 订单日期 -->
+    <div class="ios-form-group">
+        <div class="ios-form-row">
+            <label class="ios-form-label">日期</label>
+            <input type="date" class="ios-form-input" name="order_date" form="confirmForm"
+                   value="{{ order_date }}">
+        </div>
+    </div>
+
+    <!-- 识别结果表格 -->
+    <div class="section-title">
+        识别结果（{{ item_count }} 项，可编辑）{% if recognition_method %} · {{ recognition_method }}{% endif %}
+    </div>
+    <div style="margin:0 var(--sp-md);overflow-x:auto;">
+        <form id="confirmForm" method="post" action="{% url 'ocr:confirm' %}">
+            {% csrf_token %}
+            <input type="hidden" name="image_path" value="{{ image_path }}">
+            <input type="hidden" name="raw_text" value="{{ raw_text }}">
+
+            <table class="ios-table">
+                <thead>
+                    <tr>
+                        <th style="min-width:120px;">食材名称</th>
+                        <th style="width:60px;">数量</th>
+                        <th style="width:80px;">单价</th>
+                        <th style="width:50px;">状态</th>
+                        <th style="width:56px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="(item, idx) in items" :key="idx">
+                        <tr>
+                            <td>
+                                <input type="text" :name="'dish_name[]'" x-model="item.dish_name">
+                                <input type="hidden" :name="'dish_id[]'" x-model="item.dish_id">
+                            </td>
+                            <td><input type="number" :name="'quantity[]'" x-model="item.quantity" step="0.5" min="0.5" style="width:50px;text-align:center;"></td>
+                            <td><input type="number" :name="'unit_price[]'" x-model="item.unit_price" step="0.01" min="0" style="width:70px;text-align:center;"></td>
+                            <td style="text-align:center;">
+                                <span x-show="item.is_matched" class="badge badge-success">已匹配</span>
+                                <span x-show="!item.is_matched" class="badge badge-warning">新食材</span>
+                            </td>
+                            <td style="text-align:center;">
+                                <button type="button"
+                                        class="btn btn-secondary btn-sm text-danger"
+                                        @click="removeRow(idx)">
+                                    删除
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+
+            <!-- 添加行 -->
+            <div style="padding:var(--sp-sm) 0;">
+                <button type="button" class="btn btn-secondary btn-sm" @click="addRow()">+ 添加食材</button>
+                <button type="button" class="btn btn-secondary btn-sm text-danger" @click="removeLastRow()" x-show="items.length > 0">- 删除末行</button>
+            </div>
+
+            <!-- 自动创建新食材开关 -->
+            {% include "components/_toggle.html" with name="auto_create_dish" checked=True label="自动添加新食材到系统" %}
+
+            <!-- 提交 -->
+            <div style="padding:var(--sp-md) 0;">
+                <button type="submit" class="btn btn-primary btn-block">确认并保存订单</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function ocrResult() {
+    return {
+        items: {{ items_json|safe }},
+        showImage: false,
+        addRow() {
+            this.items.push({
+                dish_name: '',
+                quantity: 1,
+                unit_price: '',
+                dish_id: '',
+                is_matched: false,
+            });
+        },
+        removeLastRow() {
+            this.items.pop();
+        },
+        removeRow(index) {
+            this.items.splice(index, 1);
+        }
+    };
+}
+</script>
+{% endblock %}

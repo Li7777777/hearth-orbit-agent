@@ -1,0 +1,33 @@
+[project]
+name = "hearth-orbit-agent"
+version = "0.1.0"
+description = "Django-based household food orbit agent for OCR orders, ingredient inventory, storage, recipes, and meal planning."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "django>=5.2.11",
+    "django-widget-tweaks>=1.5.1",
+    "mysqlclient>=2.2.8",
+    "paddleocr>=3.4.0",
+    "paddlepaddle>=3.3.0",
+    "pillow>=12.1.1",
+    "python-dotenv>=1.2.1",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.6",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+extend-exclude = [
+    ".venv",
+    "external",
+    "media",
+    "staticfiles",
+]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

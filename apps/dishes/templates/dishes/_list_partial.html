@@ -1,0 +1,43 @@
+<!-- 食材列表局部模板 -->
+{% if dishes %}
+<div class="ios-list" id="dish-list">
+    {% for dish in dishes %}
+    <a href="{% url 'dishes:detail' pk=dish.pk %}"
+       class="ios-list-item dish-list-item"
+       data-dish-id="{{ dish.pk }}"
+       data-search-text="{{ dish.name }} {% if dish.category %}{{ dish.category.name }} {{ dish.category.icon }}{% endif %} {{ dish.specification }} {{ dish.unit }} {{ dish.storage }} {% if not dish.is_active and dish.deactivation_reason %}{{ dish.get_deactivation_reason_display }}{% endif %}">
+        <div style="display:flex;align-items:center;gap:var(--sp-md);width:100%;">
+            <div class="dish-select-indicator" aria-hidden="true">✓</div>
+            {% if dish.image %}
+            <img src="{{ dish.image.url }}" style="width:48px;height:48px;border-radius:var(--r-sm);object-fit:cover;flex-shrink:0;">
+            {% else %}
+            <div style="width:48px;height:48px;border-radius:var(--r-sm);background:var(--bg-primary);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">
+                {% if dish.category %}{{ dish.category.icon }}{% else %}🥗{% endif %}
+            </div>
+            {% endif %}
+            <div class="ios-list-item-content" style="padding:0;">
+                <div class="ios-list-item-title">
+                    {% if not dish.is_active %}<span class="status-dot status-dot-inactive"></span>{% endif %}
+                    {{ dish.name }}
+                </div>
+                <div class="ios-list-item-subtitle">
+                    {% if dish.category %}{{ dish.category.name }} | {% endif %}已买入{{ dish.days_in_stock }}天
+                    {% if dish.specification %}| {{ dish.specification }}{% endif %}
+                    {% if dish.default_price %}| ¥{{ dish.default_price }}/{{ dish.unit }}{% endif %}
+                    {% if not dish.is_active and dish.deactivation_reason %}| {{ dish.get_deactivation_reason_display }}{% endif %}
+                </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+                <div style="font-size:var(--fs-subhead);font-weight:600;color:var(--primary);">{{ dish.total_ordered|floatformat:-2 }}</div>
+                <div style="font-size:var(--fs-caption2);color:var(--label-tertiary);">{{ dish.unit }}</div>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+<div id="dish-search-empty" hidden>
+    {% include "components/_empty_state.html" with icon="🔎" title="没有匹配的食材" desc="换个关键词再试试" %}
+</div>
+{% else %}
+{% include "components/_empty_state.html" with icon="🥗" title="暂无食材" desc="添加第一个食材开始管理" action_url="/dish/create/" action_text="新增食材" %}
+{% endif %}

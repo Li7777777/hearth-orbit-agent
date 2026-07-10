@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}登录 - AI菜量菜谱{% endblock %}
+{% block content %}
+<div class="login-page">
+    <div class="login-card">
+        <div class="login-title">AI菜量菜谱</div>
+        <div class="login-subtitle">智能订单识别与菜量管理</div>
+
+        {% if messages %}
+        {% for msg in messages %}
+        <div class="login-error">{{ msg }}</div>
+        {% endfor %}
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="text" name="username" class="login-input" placeholder="用户名" required autocomplete="username">
+            <input type="password" name="password" class="login-input" placeholder="密码" required autocomplete="current-password">
+            <button type="submit" class="btn btn-primary btn-block" style="margin-top:4px;">登录</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

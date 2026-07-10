@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}视觉辅助设置 - AI菜量菜谱{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-inner">
+        <a href="{% url 'ocr:upload' %}" class="btn btn-secondary btn-sm">返回</a>
+        <span style="font-size:var(--fs-headline);font-weight:600;">视觉辅助设置</span>
+        <span></span>
+    </div>
+</div>
+
+<div class="container" x-data="visionSettings({
+    provider: '{{ config.provider|escapejs }}',
+    baseUrl: '{{ config.base_url|escapejs }}',
+    model: '{{ config.model|escapejs }}',
+    providerName: '{{ config.provider_name|escapejs }}'
+})">
+    <div class="ios-card" style="margin:var(--sp-md);">
+        <div class="ios-card-body" style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-md);">
+            <div>
+                <div style="font-size:var(--fs-headline);font-weight:600;">配置状态</div>
+                <div style="font-size:var(--fs-footnote);color:var(--label-secondary);margin-top:2px;">
+                    检查只验证本地字段完整性，不会向第三方 API 发起请求
+                </div>
+            </div>
+            <span class="badge {% if check_result.ok %}badge-success{% else %}badge-warning{% endif %}">
+                {% if check_result.ok %}配置完整{% else %}需要补全{% endif %}
+            </span>
+        </div>
+    </div>
+
+    <div class="ios-list">
+        {% for message in check_result.messages %}
+        <div class="ios-list-item">
+            <div class="ios-list-item-content">
+                <div class="ios-list-item-title">{{ message }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <form method="post" action="{% url 'ocr:vision_settings' %}">
+        {% csrf_token %}
+
+        <div class="ios-form-group">
+            {% include "components/_toggle.html" with name="enabled" checked=config.enabled label="启用视觉辅助" %}
+        </div>
+
+        <div class="section-title">服务商</div>
+        <div class="ios-form-group">
+            <div class="ios-form-row">
+                <label class="ios-form-label">接口</label>
+                <select class="ios-form-input" name="provider" x-model="provider" @change="applyProviderDefaults()">
+                    {% for value, label in provider_choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="ios-form-row" x-show="provider === 'openai_compatible'" x-cloak>
+                <label class="ios-form-label">名称</label>
+                <input type="text" class="ios-form-input" name="provider_name" x-model="providerName" placeholder="如硅基流动">
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">模型</label>
+                <input type="text" class="ios-form-input" name="model" x-model="model" placeholder="视觉模型名称">
+            </div>
+            <div class="ios-form-row" x-show="provider === 'openai_compatible'" x-cloak>
+                <label class="ios-form-label">Base URL</label>
+                <input type="url" class="ios-form-input" name="base_url" x-model="baseUrl" placeholder="https://api.example.com/v1">
+            </div>
+            <template x-if="provider !== 'openai_compatible'">
+                <input type="hidden" name="base_url" value="">
+            </template>
+            <div class="ios-form-row">
+                <label class="ios-form-label">超时</label>
+                <input type="number" class="ios-form-input" name="timeout_seconds" value="{{ config.timeout_seconds }}" min="5" step="1">
+            </div>
+            <div class="ios-form-row">
+                <label class="ios-form-label">RPM</label>
+                <input type="number" class="ios-form-input" name="requests_per_minute" value="{{ config.requests_per_minute }}" min="1" step="1">
+            </div>
+        </div>
+
+        <div class="section-title">密钥</div>
+        <div class="ios-form-group">
+            <div class="ios-form-row" style="flex-direction:column;align-items:stretch;">
+                <label class="ios-form-label" style="width:auto;margin-bottom:var(--sp-sm);">API Key</label>
+                <input type="password" class="ios-form-input-full" name="api_key" autocomplete="off"
+                       placeholder="{% if config.masked_api_key %}已保存 {{ config.masked_api_key }}，留空则保持不变{% else %}粘贴 API Key{% endif %}">
+            </div>
+            {% if config.has_api_key %}
+            {% include "components/_toggle.html" with name="clear_api_key" checked=False label="清空已保存 API Key" %}
+            {% endif %}
+        </div>
+
+        <div class="section-title">识别提示词</div>
+        <div class="ios-form-group" style="padding:var(--sp-md);">
+            <textarea name="prompt" class="ios-form-input-full" rows="8">{{ config.prompt }}</textarea>
+        </div>
+
+        <div style="padding:0 var(--sp-md) var(--sp-md);display:grid;gap:var(--sp-sm);">
+            <button type="submit" name="action" value="check" class="btn btn-secondary btn-block">检查当前填写</button>
+            <button type="submit" name="action" value="save" class="btn btn-primary btn-block">保存配置</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function visionSettings(initial) {
+    return {
+        provider: initial.provider || 'openai',
+        baseUrl: initial.baseUrl || '',
+        model: initial.model || '',
+        providerName: initial.providerName || '',
+        defaults: {
+            openai: { model: 'gpt-4o-mini', baseUrl: '' },
+            anthropic: { model: 'claude-sonnet-4-20250514', baseUrl: '' },
+            openai_compatible: { model: 'gpt-4o-mini', baseUrl: '' },
+        },
+        applyProviderDefaults() {
+            const selected = this.defaults[this.provider] || this.defaults.openai;
+            this.baseUrl = selected.baseUrl;
+            if (!this.model || this.model.startsWith('gpt-') || this.model.startsWith('claude-')) {
+                this.model = selected.model;
+            }
+        },
+    };
+}
+</script>
+{% endblock %}

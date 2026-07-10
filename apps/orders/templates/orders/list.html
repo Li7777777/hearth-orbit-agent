@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}订单管理 - AI菜量菜谱{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-inner">
+        <div class="page-title">订单管理</div>
+        <a href="{% url 'orders:statistics' %}" class="btn btn-secondary btn-sm">📊 统计</a>
+    </div>
+</div>
+
+<div class="container">
+    <!-- 日期筛选 -->
+    <div class="ios-form-group">
+        <form method="get" style="display:flex;align-items:center;padding:8px var(--sp-md);gap:var(--sp-sm);">
+            <input type="date" name="date_from" value="{{ date_from }}" class="ios-form-input-full" style="flex:1;" placeholder="开始日期">
+            <span style="color:var(--label-secondary);">至</span>
+            <input type="date" name="date_to" value="{{ date_to }}" class="ios-form-input-full" style="flex:1;" placeholder="结束日期">
+            <button type="submit" class="btn btn-primary btn-sm">筛选</button>
+        </form>
+    </div>
+
+    <!-- 订单列表 -->
+    {% if page_obj.object_list %}
+    <div class="ios-list">
+        {% for order in page_obj %}
+        <a href="{% url 'orders:detail' pk=order.pk %}" class="ios-list-item">
+            <div class="ios-list-item-content">
+                <div class="ios-list-item-title">
+                    {{ order.order_date }}
+                    <span class="badge {% if order.source == 'ocr' %}badge-primary{% else %}badge-success{% endif %}" style="margin-left:6px;">
+                        {{ order.get_source_display }}
+                    </span>
+                </div>
+                <div class="ios-list-item-subtitle">
+                    {{ order.total_items }} 道食材
+                    {% if order.total_amount %}| ¥{{ order.total_amount }}{% endif %}
+                </div>
+            </div>
+            <div class="ios-list-item-right">
+                {{ order.created_at|date:"H:i" }}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% include "components/_pagination.html" with page_obj=page_obj %}
+    {% else %}
+    {% include "components/_empty_state.html" with icon="📋" title="暂无订单" desc="通过OCR识别或手动添加订单" action_url="/ocr/upload/" action_text="去识别" %}
+    {% endif %}
+</div>
+
+<!-- FAB: 新增订单 -->
+<a href="{% url 'ocr:upload' %}" class="fab">+</a>
+{% endblock %}

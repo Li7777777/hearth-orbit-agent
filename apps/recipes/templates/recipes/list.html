@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}菜谱管理 - AI菜量菜谱{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-inner">
+        <div class="page-title">菜谱管理</div>
+        <div style="display:flex;gap:var(--sp-sm);">
+            <form method="post" action="{% url 'recipes:sync_external' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-secondary btn-sm">同步外部</button>
+            </form>
+            <a href="{% url 'recipes:create' %}" class="btn btn-primary btn-sm">+ 新增</a>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    {# 搜索 #}
+    <div class="search-bar">
+        <div class="search-wrapper">
+            <form method="get" action="{% url 'recipes:list' %}" style="display:flex;gap:var(--sp-sm);width:100%;">
+                {% if current_category %}
+                <input type="hidden" name="category" value="{{ current_category }}">
+                {% endif %}
+                <input type="search" class="search-input" placeholder="搜索菜谱..."
+                       name="q" value="{{ query }}" style="flex:1;">
+                <button type="submit" class="btn btn-primary btn-sm">搜索</button>
+            </form>
+        </div>
+    </div>
+
+    {# 分类筛选 #}
+    <div class="segment-scroll-wrapper">
+        <div class="ios-segment">
+            <a href="{% url 'recipes:list' %}{% if query %}?q={{ query }}{% endif %}"
+               class="ios-segment-btn {% if not current_category %}active{% endif %}">全部</a>
+            {% for cat in categories %}
+            <a href="{% url 'recipes:list' %}?category={{ cat.id }}{% if query %}&q={{ query }}{% endif %}"
+               class="ios-segment-btn {% if current_category == cat.id|stringformat:'d' %}active{% endif %}">{{ cat.icon }} {{ cat.name }}</a>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# 菜谱列表 #}
+    {% if page_obj.object_list %}
+    <div class="ios-list">
+        {% for recipe in page_obj %}
+        <a href="{% url 'recipes:detail' pk=recipe.pk %}" class="ios-list-item">
+            <div style="display:flex;align-items:center;gap:var(--sp-md);width:100%;">
+                {% if recipe.display_image_url %}
+                <img src="{{ recipe.display_image_url }}" alt="{{ recipe.display_image_alt }}" style="width:56px;height:56px;border-radius:var(--r-sm);object-fit:cover;">
+                {% else %}
+                <div style="width:56px;height:56px;border-radius:var(--r-sm);background:var(--bg-primary);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">🍳</div>
+                {% endif %}
+                <div class="ios-list-item-content" style="padding:0;">
+                    <div class="ios-list-item-title">{{ recipe.name }}</div>
+                    <div class="ios-list-item-subtitle">
+                        {% if recipe.category %}{{ recipe.category.icon }} {{ recipe.category.name }} | {% endif %}
+                        {{ recipe.difficulty }}
+                        {% if recipe.cook_time_minutes %}| {{ recipe.cook_time_minutes }}分钟{% endif %}
+                        {% if recipe.source != 'local' %}| 外部源{% endif %}
+                        {% if recipe.has_external_media %}| {{ recipe.media_display_label }}{% endif %}
+                    </div>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% include "components/_pagination.html" with page_obj=page_obj %}
+    {% else %}
+    {% include "components/_empty_state.html" with icon="🍳" title="暂无菜谱" desc="添加第一个菜谱开始记录" action_url="/recipe/create/" action_text="新增菜谱" %}
+    {% endif %}
+</div>
+{% endblock %}

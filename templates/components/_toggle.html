@@ -1,0 +1,10 @@
+{# iOS Toggle Switch #}
+{# 用法: include "components/_toggle.html" with name="is_active" checked=dish.is_active label="启用" #}
+<div class="toggle-row">
+    <span class="toggle-label">{{ label }}</span>
+    <label class="ios-toggle">
+        <input type="checkbox" name="{{ name }}" {% if checked %}checked{% endif %}
+               {% if onchange %}@change="{{ onchange }}"{% endif %}>
+        <div class="ios-toggle-track"></div>
+    </label>
+</div>

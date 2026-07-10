@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+{% block title %}食材管理 - AI菜量菜谱{% endblock %}
+{% block extra_head %}
+<style>
+.dish-selection-bar {
+    margin: 0 var(--sp-md) var(--sp-md);
+    padding: var(--sp-md);
+    background: var(--bg-secondary);
+    border-radius: var(--r-md);
+    border: 0.5px solid var(--separator-light);
+}
+.dish-selection-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-sm);
+}
+.dish-selection-count {
+    font-size: var(--fs-subhead);
+    font-weight: 600;
+    color: var(--label);
+}
+.dish-selection-actions {
+    margin-top: var(--sp-sm);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-sm);
+}
+.dish-selection-cancel-btn {
+    min-width: 96px;
+    padding: 10px 18px;
+    font-size: var(--fs-subhead);
+    font-weight: 600;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--separator);
+    background: #fff;
+    color: var(--label);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.dish-selection-tip {
+    margin: 0 var(--sp-md) var(--sp-sm);
+    color: var(--label-secondary);
+    font-size: var(--fs-footnote);
+}
+.dish-select-indicator {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid var(--separator);
+    color: transparent;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+body.dish-select-mode .dish-select-indicator {
+    display: inline-flex;
+}
+body.dish-select-mode .dish-list-item {
+    user-select: none;
+}
+body.dish-select-mode .dish-list-item.selected {
+    background: rgba(52, 199, 89, 0.12);
+}
+body.dish-select-mode .dish-list-item.selected .dish-select-indicator {
+    background: var(--success);
+    border-color: var(--success);
+    color: #fff;
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-inner">
+        <div class="page-title">食材管理</div>
+        <a href="{% url 'dishes:create' %}" class="btn btn-primary btn-sm">+ 新增</a>
+    </div>
+</div>
+
+<div class="container">
+    <!-- 搜索 -->
+    <div class="search-bar">
+        <div class="search-wrapper">
+            <input type="search" class="search-input" id="dish-search-input" placeholder="搜索食材..." autocomplete="off">
+        </div>
+    </div>
+
+    <!-- 分类筛选 -->
+    <div class="segment-scroll-wrapper">
+        <div class="ios-segment">
+            <a href="{% url 'dishes:list' %}{% if show_inactive %}?inactive=1{% endif %}"
+               class="ios-segment-btn {% if not current_category %}active{% endif %}">全部</a>
+            {% for cat in categories %}
+            <a href="{% url 'dishes:list' %}?category={{ cat.id }}{% if show_inactive %}&inactive=1{% endif %}"
+               class="ios-segment-btn {% if current_category == cat.id|stringformat:'d' %}active{% endif %}">{{ cat.icon }} {{ cat.name }}</a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div id="dish-selection-tip" class="dish-selection-tip">长按食材进入多选模式</div>
+    <div id="dish-selection-bar" class="dish-selection-bar" hidden>
+        <div class="dish-selection-meta">
+            <span id="dish-selection-count" class="dish-selection-count">已选0项</span>
+            <button type="button" id="dish-selection-cancel" class="btn dish-selection-cancel-btn">取消</button>
+        </div>
+        <div class="dish-selection-actions">
+            <form method="post" action="{% url 'dishes:bulk_mark_eaten' %}" class="dish-bulk-form">
+                {% csrf_token %}
+                <input type="hidden" name="dish_ids" class="js-bulk-dish-ids">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-success btn-sm btn-block js-bulk-action-btn" disabled>批量吃完了</button>
+            </form>
+            <form method="post" action="{% url 'dishes:bulk_mark_discarded' %}" class="dish-bulk-form">
+                {% csrf_token %}
+                <input type="hidden" name="dish_ids" class="js-bulk-dish-ids">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-danger btn-sm btn-block js-bulk-action-btn" disabled>批量丢掉了</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 食材列表 -->
+    <div id="dish-list-area">
+        {% include "dishes/_list_partial.html" %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const listArea = document.getElementById('dish-list-area');
+    if (!listArea) return;
+
+    const searchInput = document.getElementById('dish-search-input');
+    const searchEmpty = document.getElementById('dish-search-empty');
+    const selectionBar = document.getElementById('dish-selection-bar');
+    const selectionTip = document.getElementById('dish-selection-tip');
+    const countEl = document.getElementById('dish-selection-count');
+    const cancelBtn = document.getElementById('dish-selection-cancel');
+    const idsInputs = Array.from(document.querySelectorAll('.js-bulk-dish-ids'));
+    const actionBtns = Array.from(document.querySelectorAll('.js-bulk-action-btn'));
+    const bulkForms = Array.from(document.querySelectorAll('.dish-bulk-form'));
+
+    const selectedIds = new Set();
+    const LONG_PRESS_MS = 450;
+    let selectionMode = false;
+    let longPressTimer = null;
+    let longPressTriggered = false;
+
+    function clearPressTimer() {
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+    }
+
+    function getDishItem(target) {
+        return target.closest('.dish-list-item[data-dish-id]');
+    }
+
+    function updateSelectionState() {
+        const joined = Array.from(selectedIds).join(',');
+        idsInputs.forEach((input) => {
+            input.value = joined;
+        });
+        actionBtns.forEach((btn) => {
+            btn.disabled = selectedIds.size === 0;
+        });
+        if (countEl) {
+            countEl.textContent = `已选${selectedIds.size}项`;
+        }
+    }
+
+    function clearSelection() {
+        selectedIds.clear();
+        listArea.querySelectorAll('.dish-list-item.selected').forEach((item) => {
+            item.classList.remove('selected');
+            item.setAttribute('aria-selected', 'false');
+        });
+        updateSelectionState();
+    }
+
+    function setSelectionMode(enabled) {
+        selectionMode = enabled;
+        document.body.classList.toggle('dish-select-mode', enabled);
+        if (selectionBar) selectionBar.hidden = !enabled;
+        if (selectionTip) selectionTip.hidden = enabled;
+        if (!enabled) clearSelection();
+    }
+
+    function setItemSelected(item, shouldSelect) {
+        const dishId = item.dataset.dishId;
+        if (!dishId) return;
+        if (shouldSelect) {
+            selectedIds.add(dishId);
+            item.classList.add('selected');
+            item.setAttribute('aria-selected', 'true');
+        } else {
+            selectedIds.delete(dishId);
+            item.classList.remove('selected');
+            item.setAttribute('aria-selected', 'false');
+        }
+        updateSelectionState();
+    }
+
+    function enterSelectionMode(item) {
+        if (!selectionMode) setSelectionMode(true);
+        setItemSelected(item, true);
+        if (navigator.vibrate) navigator.vibrate(15);
+    }
+
+    function normalizeSearchText(value) {
+        return (value || '').trim().toLowerCase();
+    }
+
+    function filterDishes() {
+        const query = normalizeSearchText(searchInput ? searchInput.value : '');
+        const items = Array.from(listArea.querySelectorAll('.dish-list-item[data-dish-id]'));
+        let visibleCount = 0;
+
+        if (selectionMode) setSelectionMode(false);
+
+        items.forEach((item) => {
+            const searchable = normalizeSearchText(item.dataset.searchText || item.textContent);
+            const isVisible = !query || searchable.includes(query);
+            item.hidden = !isVisible;
+            if (isVisible) visibleCount += 1;
+        });
+
+        if (searchEmpty) {
+            searchEmpty.hidden = !query || visibleCount > 0;
+        }
+    }
+
+    listArea.addEventListener('touchstart', (event) => {
+        const item = getDishItem(event.target);
+        if (!item || selectionMode) return;
+        clearPressTimer();
+        longPressTriggered = false;
+        longPressTimer = setTimeout(() => {
+            longPressTriggered = true;
+            enterSelectionMode(item);
+        }, LONG_PRESS_MS);
+    }, { passive: true });
+
+    listArea.addEventListener('touchmove', clearPressTimer, { passive: true });
+    listArea.addEventListener('touchend', clearPressTimer, { passive: true });
+    listArea.addEventListener('touchcancel', clearPressTimer, { passive: true });
+
+    listArea.addEventListener('mousedown', (event) => {
+        if (event.button !== 0) return;
+        const item = getDishItem(event.target);
+        if (!item || selectionMode) return;
+        clearPressTimer();
+        longPressTriggered = false;
+        longPressTimer = setTimeout(() => {
+            longPressTriggered = true;
+            enterSelectionMode(item);
+        }, LONG_PRESS_MS);
+    });
+
+    listArea.addEventListener('mouseup', clearPressTimer);
+    listArea.addEventListener('mouseleave', clearPressTimer);
+
+    listArea.addEventListener('click', (event) => {
+        const item = getDishItem(event.target);
+        if (!item) return;
+
+        if (selectionMode) {
+            event.preventDefault();
+            const shouldSelect = !selectedIds.has(item.dataset.dishId);
+            setItemSelected(item, shouldSelect);
+            return;
+        }
+
+        if (longPressTriggered) {
+            event.preventDefault();
+            longPressTriggered = false;
+        }
+    });
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => setSelectionMode(false));
+    }
+
+    bulkForms.forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            if (selectedIds.size > 0) return;
+            event.preventDefault();
+            showToast('请先选择食材', 'error');
+        });
+    });
+
+    if (searchInput) {
+        searchInput.addEventListener('input', filterDishes);
+    }
+
+    document.body.addEventListener('htmx:afterSwap', (event) => {
+        if (event.target && event.target.id === 'dish-list-area') {
+            setSelectionMode(false);
+            filterDishes();
+        }
+    });
+
+    updateSelectionState();
+    filterDishes();
+})();
+</script>
+{% endblock %}

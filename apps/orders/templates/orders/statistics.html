@@ -1,0 +1,483 @@
+{% extends "base.html" %}
+{% block title %}统计分析 - AI菜量菜谱{% endblock %}
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-header-inner">
+        <a href="{% url 'orders:list' %}" class="btn btn-secondary btn-sm">← 返回</a>
+        <span style="font-size:var(--fs-headline);font-weight:600;">统计分析</span>
+        <span></span>
+    </div>
+</div>
+
+<div class="container">
+    <div class="ios-segment">
+        <a href="?days=7" class="ios-segment-btn {% if days == 7 %}active{% endif %}">近7天</a>
+        <a href="?days=14" class="ios-segment-btn {% if days == 14 %}active{% endif %}">近14天</a>
+        <a href="?days=30" class="ios-segment-btn {% if days == 30 %}active{% endif %}">近30天</a>
+    </div>
+
+    <div class="stat-grid">
+        <div class="stat-card">
+            <div class="stat-value">¥{{ period_total_amount|floatformat:2 }}</div>
+            <div class="stat-label">区间总金额</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">¥{{ avg_order_amount|floatformat:2 }}</div>
+            <div class="stat-label">订单均价</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">¥{{ avg_daily_amount|floatformat:2 }}</div>
+            <div class="stat-label">日均金额</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ period_total_quantity|floatformat:0 }}</div>
+            <div class="stat-label">区间总菜量(份)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ discard_total }}</div>
+            <div class="stat-label">丢掉食材(次)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">¥{{ discard_total_amount|floatformat:2 }}</div>
+            <div class="stat-label">丢弃金额(估算)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">¥{{ discard_avg_amount|floatformat:2 }}</div>
+            <div class="stat-label">单次丢弃均值</div>
+        </div>
+    </div>
+
+    <div class="chart-container">
+        <h3 style="font-size:var(--fs-headline);font-weight:600;margin-bottom:var(--sp-md);">菜量趋势</h3>
+        <canvas id="trendChart" style="height:220px;"></canvas>
+    </div>
+
+    <div class="chart-container">
+        <h3 style="font-size:var(--fs-headline);font-weight:600;margin-bottom:var(--sp-md);">金额趋势</h3>
+        <canvas id="amountTrendChart" style="height:220px;"></canvas>
+    </div>
+
+    <div class="chart-container">
+        <h3 style="font-size:var(--fs-headline);font-weight:600;margin-bottom:var(--sp-md);">价格维度分析</h3>
+        <div class="ios-segment" style="margin:0 0 var(--sp-md);">
+            <button type="button" class="ios-segment-btn active" data-dim="category">按分类</button>
+            <button type="button" class="ios-segment-btn" data-dim="source">按来源</button>
+            <button type="button" class="ios-segment-btn" data-dim="dish">按食材TOP</button>
+        </div>
+        <canvas id="priceDimensionChart" style="height:280px;"></canvas>
+    </div>
+
+    <div class="chart-container">
+        <h3 style="font-size:var(--fs-headline);font-weight:600;margin-bottom:var(--sp-md);">食材丢弃趋势</h3>
+        <canvas id="discardTrendChart" style="height:220px;"></canvas>
+    </div>
+
+    <div class="chart-container">
+        <h3 style="font-size:var(--fs-headline);font-weight:600;margin-bottom:var(--sp-md);">食材丢弃金额趋势</h3>
+        <canvas id="discardAmountTrendChart" style="height:220px;"></canvas>
+    </div>
+
+    <div class="chart-container">
+        <h3 style="font-size:var(--fs-headline);font-weight:600;margin-bottom:var(--sp-md);">丢弃分类分布</h3>
+        <canvas id="discardCategoryChart" style="height:260px;"></canvas>
+    </div>
+
+    <div class="chart-container">
+        <h3 style="font-size:var(--fs-headline);font-weight:600;margin-bottom:var(--sp-md);">丢弃分类金额分布</h3>
+        <canvas id="discardCategoryAmountChart" style="height:260px;"></canvas>
+    </div>
+
+    <div class="section-title">热门食材 TOP 10（按菜量）</div>
+    {% if top_dishes %}
+    <div class="ios-list">
+        {% for item in top_dishes %}
+        <div class="ios-list-item">
+            <div class="ios-list-item-content">
+                <div class="ios-list-item-title">{{ forloop.counter }}. {{ item.dish__name }}</div>
+            </div>
+            <div class="ios-list-item-right" style="font-weight:600;color:var(--primary);">
+                {{ item.total }}份
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    {% include "components/_empty_state.html" with icon="📊" title="暂无统计数据" desc="上传订单后自动生成统计" %}
+    {% endif %}
+
+    {% if top_amount_dishes %}
+    <div class="section-title">高消费食材 TOP 10（按金额）</div>
+    <div class="ios-list">
+        {% for item in top_amount_dishes %}
+        <div class="ios-list-item">
+            <div class="ios-list-item-content">
+                <div class="ios-list-item-title">{{ forloop.counter }}. {{ item.dish__name }}</div>
+            </div>
+            <div class="ios-list-item-right" style="font-weight:600;color:var(--warning);">
+                ¥{{ item.total_amount|floatformat:2 }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="section-title">近期丢弃记录</div>
+    {% if discarded_items %}
+    <div class="ios-list">
+        {% for dish in discarded_items %}
+        <div class="ios-list-item">
+            <div class="ios-list-item-content">
+                <div class="ios-list-item-title">{{ dish.name }}</div>
+                <div class="ios-list-item-subtitle">
+                    {% if dish.category %}{{ dish.category.name }} | {% endif %}{{ dish.deactivated_at }}
+                </div>
+            </div>
+            <div class="ios-list-item-right" style="font-weight:600;color:var(--danger);">
+                {% if dish.default_price %}¥{{ dish.default_price }}{% else %}丢掉{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    {% include "components/_empty_state.html" with icon="🗑️" title="暂无丢弃记录" desc="将食材标记为“丢掉了”后会显示在这里" %}
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const labels = {{ chart_labels|safe }};
+    const qtyData = {{ chart_data|safe }};
+    const amountData = {{ chart_amount_data|safe }};
+    const priceDimensions = {{ price_dimension_payload|safe }};
+    const discardDailyData = {{ discard_daily_data|safe }};
+    const discardAmountDailyData = {{ discard_amount_daily_data|safe }};
+    const discardCategoryPayload = {{ discard_category_payload|safe }};
+    const discardCategoryAmountPayload = {{ discard_category_amount_payload|safe }};
+
+    const trendCtx = document.getElementById('trendChart');
+    if (trendCtx) {
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '菜量(份)',
+                    data: qtyData,
+                    borderColor: '#007AFF',
+                    backgroundColor: 'rgba(0,122,255,0.08)',
+                    fill: true,
+                    tension: 0.35,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#007AFF',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    const amountTrendCtx = document.getElementById('amountTrendChart');
+    if (amountTrendCtx) {
+        new Chart(amountTrendCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '金额(元)',
+                    data: amountData,
+                    borderColor: '#FF9500',
+                    backgroundColor: 'rgba(255,149,0,0.14)',
+                    fill: true,
+                    tension: 0.35,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#FF9500',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(0,0,0,0.05)' },
+                        ticks: {
+                            callback: function(value) { return '¥' + value; }
+                        }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    const dimCanvas = document.getElementById('priceDimensionChart');
+    const dimButtons = Array.from(document.querySelectorAll('[data-dim]'));
+    let dimChart = null;
+
+    function normalizedPayload(dimension) {
+        const payload = priceDimensions[dimension] || {};
+        const labels = Array.isArray(payload.labels) ? payload.labels : [];
+        const data = Array.isArray(payload.data) ? payload.data : [];
+        if (!labels.length || !data.length) {
+            return { labels: ['暂无数据'], data: [0], empty: true };
+        }
+        return { labels: labels, data: data, empty: false };
+    }
+
+    function renderDimensionChart(dimension) {
+        if (!dimCanvas) return;
+        const payload = normalizedPayload(dimension);
+        if (dimChart) {
+            dimChart.destroy();
+        }
+
+        let config = null;
+        if (dimension === 'category') {
+            config = {
+                type: 'doughnut',
+                data: {
+                    labels: payload.labels,
+                    datasets: [{
+                        data: payload.data,
+                        backgroundColor: payload.empty
+                            ? ['rgba(60, 60, 67, 0.25)']
+                            : ['#007AFF', '#34C759', '#FF9500', '#5AC8FA', '#AF52DE', '#FF2D55', '#32ADE6', '#5856D6'],
+                        borderWidth: 1,
+                        borderColor: '#fff',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) { return ctx.label + ': ¥' + ctx.raw; }
+                            }
+                        }
+                    }
+                }
+            };
+        } else if (dimension === 'source') {
+            config = {
+                type: 'bar',
+                data: {
+                    labels: payload.labels,
+                    datasets: [{
+                        label: '金额(元)',
+                        data: payload.data,
+                        backgroundColor: payload.empty ? 'rgba(60, 60, 67, 0.25)' : '#5AC8FA',
+                        borderRadius: 6,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) { return '¥' + value; }
+                            }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            };
+        } else {
+            config = {
+                type: 'bar',
+                data: {
+                    labels: payload.labels,
+                    datasets: [{
+                        label: '金额(元)',
+                        data: payload.data,
+                        backgroundColor: payload.empty ? 'rgba(60, 60, 67, 0.25)' : '#FF9500',
+                        borderRadius: 6,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) { return '¥' + value; }
+                            }
+                        },
+                        y: { grid: { display: false } }
+                    }
+                }
+            };
+        }
+
+        dimChart = new Chart(dimCanvas, config);
+    }
+
+    dimButtons.forEach(function(button) {
+        button.addEventListener('click', function() {
+            dimButtons.forEach(function(other) { other.classList.remove('active'); });
+            button.classList.add('active');
+            renderDimensionChart(button.dataset.dim);
+        });
+    });
+
+    renderDimensionChart('category');
+
+    const discardTrendCtx = document.getElementById('discardTrendChart');
+    if (discardTrendCtx) {
+        new Chart(discardTrendCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '丢弃次数',
+                    data: discardDailyData,
+                    borderColor: '#FF3B30',
+                    backgroundColor: 'rgba(255,59,48,0.15)',
+                    fill: true,
+                    tension: 0.35,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#FF3B30',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, precision: 0 },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    const discardCategoryCanvas = document.getElementById('discardCategoryChart');
+    if (discardCategoryCanvas) {
+        const labels = Array.isArray(discardCategoryPayload.labels) && discardCategoryPayload.labels.length
+            ? discardCategoryPayload.labels
+            : ['暂无数据'];
+        const data = Array.isArray(discardCategoryPayload.data) && discardCategoryPayload.data.length
+            ? discardCategoryPayload.data
+            : [0];
+        const isEmpty = data.length === 1 && data[0] === 0;
+        new Chart(discardCategoryCanvas, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: isEmpty
+                        ? ['rgba(60, 60, 67, 0.25)']
+                        : ['#FF3B30', '#FF9500', '#FF2D55', '#AF52DE', '#5AC8FA', '#34C759'],
+                    borderWidth: 1,
+                    borderColor: '#fff',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) { return ctx.label + ': ' + ctx.raw + '次'; }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    const discardAmountTrendCtx = document.getElementById('discardAmountTrendChart');
+    if (discardAmountTrendCtx) {
+        new Chart(discardAmountTrendCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '丢弃金额(元)',
+                    data: discardAmountDailyData,
+                    borderColor: '#C2185B',
+                    backgroundColor: 'rgba(194,24,91,0.15)',
+                    fill: true,
+                    tension: 0.35,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#C2185B',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) { return '¥' + value; }
+                        }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    const discardCategoryAmountCanvas = document.getElementById('discardCategoryAmountChart');
+    if (discardCategoryAmountCanvas) {
+        const labels = Array.isArray(discardCategoryAmountPayload.labels) && discardCategoryAmountPayload.labels.length
+            ? discardCategoryAmountPayload.labels
+            : ['暂无数据'];
+        const data = Array.isArray(discardCategoryAmountPayload.data) && discardCategoryAmountPayload.data.length
+            ? discardCategoryAmountPayload.data
+            : [0];
+        const isEmpty = data.length === 1 && data[0] === 0;
+        new Chart(discardCategoryAmountCanvas, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '丢弃金额(元)',
+                    data: data,
+                    backgroundColor: isEmpty ? 'rgba(60, 60, 67, 0.25)' : '#C2185B',
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) { return '¥' + value; }
+                        }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,10 @@
+{# iOS 空状态占位 #}
+{# 用法: include "components/_empty_state.html" with icon="📋" title="暂无数据" desc="..." action_url="..." action_text="..." #}
+<div class="empty-state">
+    <div class="empty-state-icon">{{ icon|default:"📭" }}</div>
+    <div class="empty-state-title">{{ title|default:"暂无数据" }}</div>
+    <div class="empty-state-desc">{{ desc|default:"" }}</div>
+    {% if action_url %}
+    <a href="{{ action_url }}" class="btn btn-primary btn-sm">{{ action_text|default:"添加" }}</a>
+    {% endif %}
+</div>
