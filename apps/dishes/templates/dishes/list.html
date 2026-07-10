@@ -76,7 +76,14 @@ body.dish-select-mode .dish-list-item.selected .dish-select-indicator {
 <div class="page-header">
     <div class="page-header-inner">
         <div class="page-title">食材管理</div>
-        <a href="{% url 'dishes:create' %}" class="btn btn-primary btn-sm">+ 新增</a>
+        <div class="page-actions">
+            {% if show_inactive %}
+            <a href="{% url 'dishes:list' %}{% if current_category %}?category={{ current_category }}{% endif %}" class="btn btn-secondary btn-sm">仅看启用</a>
+            {% else %}
+            <a href="{% url 'dishes:list' %}?inactive=1{% if current_category %}&category={{ current_category }}{% endif %}" class="btn btn-secondary btn-sm">查看停用</a>
+            {% endif %}
+            <a href="{% url 'dishes:create' %}" class="btn btn-primary btn-sm">+ 新增</a>
+        </div>
     </div>
 </div>
 

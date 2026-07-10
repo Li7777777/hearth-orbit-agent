@@ -13,7 +13,7 @@
     {# ── 头部卡片 ── #}
     <div class="ios-card">
         {% if dish.image %}
-        <img src="{{ dish.image.url }}" style="width:100%;max-height:200px;object-fit:cover;border-radius:var(--r-md) var(--r-md) 0 0;">
+        <img src="{{ dish.image.url }}" alt="{{ dish.name }}" style="width:100%;max-height:200px;object-fit:cover;border-radius:var(--r-md) var(--r-md) 0 0;">
         {% endif %}
         <div class="ios-card-body">
             <div style="display:flex;align-items:center;gap:var(--sp-md);">

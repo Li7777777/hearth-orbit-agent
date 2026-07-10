@@ -1,0 +1,165 @@
+<header class="settings-section-heading">
+    <div>
+        <span class="settings-eyebrow">Model routing</span>
+        <h2>文本模型</h2>
+        <p>多 Agent 与三餐推荐模型池。</p>
+    </div>
+    <span class="badge {% if active_complete_count %}badge-success{% else %}badge-warning{% endif %}">{{ active_complete_count }} 个可用</span>
+</header>
+
+{% if config_cards %}
+<div class="settings-provider-list">
+    {% for card in config_cards %}
+    {% with config=card.config check_messages=card.check_messages %}
+    <form method="post" action="{% url 'settings_center:index' %}" class="settings-provider-card">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="llm">
+        <input type="hidden" name="config_id" value="{{ config.id }}">
+        <details {% if forloop.first %}open{% endif %}>
+            <summary>
+                <span class="settings-provider-identity">
+                    <span class="settings-provider-mark">{{ config.display_label|first|upper }}</span>
+                    <span>
+                        <strong>{{ config.display_label }}</strong>
+                        <small>{{ config.provider_name|default:"未设置服务商" }} · {{ config.model|default:"未设置模型" }}</small>
+                    </span>
+                </span>
+                <span class="settings-provider-meta">
+                    <span class="badge {% if config.enabled and not check_messages %}badge-success{% elif config.enabled %}badge-warning{% else %}badge-primary{% endif %}">
+                        {% if config.enabled and not check_messages %}可用{% elif config.enabled %}待补全{% else %}停用{% endif %}
+                    </span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg>
+                </span>
+            </summary>
+
+            <div class="settings-provider-body">
+                <div class="settings-toggle-panel settings-toggle-panel-compact">
+                    <div><strong>启用模型</strong><small>优先级 {{ config.priority }}</small></div>
+                    <label class="ios-toggle">
+                        <input type="checkbox" name="enabled" {% if config.enabled %}checked{% endif %}>
+                        <span class="ios-toggle-track"></span>
+                    </label>
+                </div>
+
+                <div class="settings-field-grid">
+                    <label class="settings-field">
+                        <span>配置名称</span>
+                        <input type="text" name="name" value="{{ config.name }}" required>
+                    </label>
+                    <label class="settings-field">
+                        <span>服务商</span>
+                        <input type="text" name="provider_name" value="{{ config.provider_name }}" placeholder="例如：DeepSeek">
+                    </label>
+                    <label class="settings-field settings-field-wide">
+                        <span>模型</span>
+                        <input type="text" name="model" value="{{ config.model }}" placeholder="模型名称">
+                    </label>
+                    <label class="settings-field settings-field-wide">
+                        <span>Base URL</span>
+                        <input type="url" name="base_url" value="{{ config.base_url }}" placeholder="https://api.example.com/v1">
+                    </label>
+                    <label class="settings-field settings-field-wide">
+                        <span>API Key</span>
+                        <input type="password" name="api_key" autocomplete="new-password"
+                               placeholder="{% if config.masked_api_key %}已保存 {{ config.masked_api_key }}，留空保持不变{% else %}粘贴 API Key{% endif %}">
+                    </label>
+                    <label class="settings-field">
+                        <span>优先级</span>
+                        <input type="number" name="priority" value="{{ config.priority }}" min="1" max="9999" step="1">
+                    </label>
+                    <label class="settings-field">
+                        <span>RPM</span>
+                        <input type="number" name="requests_per_minute" value="{{ config.requests_per_minute }}" min="1" max="120" step="1">
+                    </label>
+                    <label class="settings-field">
+                        <span>超时（秒）</span>
+                        <input type="number" name="timeout_seconds" value="{{ config.timeout_seconds }}" min="5" max="600" step="1">
+                    </label>
+                    <label class="settings-field">
+                        <span>最大并发</span>
+                        <input type="number" name="max_concurrency" value="{{ config.max_concurrency }}" min="1" max="12" step="1">
+                    </label>
+                    <label class="settings-field">
+                        <span>专家并发</span>
+                        <input type="number" name="expert_concurrency" value="{{ config.expert_concurrency }}" min="1" max="3" step="1">
+                    </label>
+                    <label class="settings-field settings-field-wide">
+                        <span>备注</span>
+                        <textarea name="notes" rows="2" placeholder="可选">{{ config.notes }}</textarea>
+                    </label>
+                </div>
+
+                {% if config.has_api_key %}
+                <label class="settings-check-row">
+                    <input type="checkbox" name="clear_api_key">
+                    <span>清空已保存的 API Key</span>
+                </label>
+                {% endif %}
+
+                {% if check_messages %}
+                <div class="settings-validation-list" role="status">
+                    {% for message in check_messages %}<span>{{ message }}</span>{% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="settings-form-actions settings-form-actions-between">
+                    <button type="submit" name="action" value="llm_delete" class="btn btn-danger btn-sm"
+                            onclick="return confirm('删除这个大模型配置？')">删除配置</button>
+                    <button type="submit" name="action" value="llm_save" class="btn btn-primary">保存模型</button>
+                </div>
+            </div>
+        </details>
+    </form>
+    {% endwith %}
+    {% endfor %}
+</div>
+{% else %}
+<div class="settings-empty-state">
+    <span class="settings-empty-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+    <strong>暂无文本模型</strong>
+    <small>在下方添加第一个模型配置。</small>
+</div>
+{% endif %}
+
+<details class="settings-add-provider" {% if not config_cards %}open{% endif %}>
+    <summary>
+        <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>新增模型</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4 4 4-4"/></svg>
+    </summary>
+    <form method="post" action="{% url 'settings_center:index' %}" class="settings-provider-body">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="llm">
+        <input type="hidden" name="enabled" value="on">
+        <div class="settings-field-grid">
+            <label class="settings-field">
+                <span>配置名称</span>
+                <input type="text" name="name" placeholder="例如：DeepSeek Flash" required>
+            </label>
+            <label class="settings-field">
+                <span>服务商</span>
+                <input type="text" name="provider_name" placeholder="例如：DeepSeek">
+            </label>
+            <label class="settings-field settings-field-wide">
+                <span>模型</span>
+                <input type="text" name="model" placeholder="模型名称">
+            </label>
+            <label class="settings-field settings-field-wide">
+                <span>Base URL</span>
+                <input type="url" name="base_url" placeholder="https://api.example.com/v1">
+            </label>
+            <label class="settings-field settings-field-wide">
+                <span>API Key</span>
+                <input type="password" name="api_key" autocomplete="new-password" placeholder="粘贴 API Key">
+            </label>
+            <label class="settings-field"><span>优先级</span><input type="number" name="priority" value="10" min="1" max="9999"></label>
+            <label class="settings-field"><span>RPM</span><input type="number" name="requests_per_minute" value="5" min="1" max="120"></label>
+            <label class="settings-field"><span>超时（秒）</span><input type="number" name="timeout_seconds" value="60" min="5" max="600"></label>
+            <label class="settings-field"><span>最大并发</span><input type="number" name="max_concurrency" value="3" min="1" max="12"></label>
+            <label class="settings-field"><span>专家并发</span><input type="number" name="expert_concurrency" value="3" min="1" max="3"></label>
+            <label class="settings-field settings-field-wide"><span>备注</span><textarea name="notes" rows="2" placeholder="可选"></textarea></label>
+        </div>
+        <div class="settings-form-actions">
+            <button type="submit" name="action" value="llm_create" class="btn btn-primary">添加模型</button>
+        </div>
+    </form>
+</details>

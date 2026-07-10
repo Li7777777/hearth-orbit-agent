@@ -4,10 +4,11 @@
 <div class="page-header">
     <div class="page-header-inner">
         <div class="page-title">菜谱管理</div>
-        <div style="display:flex;gap:var(--sp-sm);">
-            <form method="post" action="{% url 'recipes:sync_external' %}">
+        <div class="page-actions">
+            <form method="post" action="{% url 'recipes:sync_external' %}" x-data="{ syncing: false }" @submit="syncing=true">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-secondary btn-sm">同步外部</button>
+                <button type="submit" class="btn btn-secondary btn-sm" :disabled="syncing"
+                        x-text="syncing ? '同步中…' : '同步外部'">同步外部</button>
             </form>
             <a href="{% url 'recipes:create' %}" class="btn btn-primary btn-sm">+ 新增</a>
         </div>

@@ -17,6 +17,12 @@ from apps.dishes.services import infer_dish_category, match_dish
 from apps.orders.models import Order, OrderItem
 from apps.orders.services import apply_order_item_effects
 
+from .configuration import (
+    apply_llm_config_form,
+    apply_vision_config_form,
+    coerce_int,
+    llm_config_messages,
+)
 from .models import LLMProviderConfig, VisionProviderConfig
 from .vision import VisionConfigError, VisionProviderError, check_vision_config, recognize_order_image_with_vision
 
@@ -114,74 +120,59 @@ def process(request):
 
 
 def vision_settings(request):
-    """视觉辅助配置页。本地检查不调用第三方 API。"""
+    """旧视觉配置入口：保留 POST 兼容并跳转到设置中心。"""
     config = VisionProviderConfig.get_solo()
-    check_result = None
+    settings_url = '/settings/?section=vision'
+    if request.method != 'POST':
+        return redirect(settings_url)
 
-    if request.method == 'POST':
-        action = request.POST.get('action', 'save')
-        draft = _apply_vision_config_form(config, request, commit=action == 'save')
-        check_result = check_vision_config(draft)
-        if action == 'save':
-            if check_result.ok:
-                messages.success(request, '视觉辅助配置已保存')
-            else:
-                messages.warning(request, '配置已保存，但仍有项目需要补全')
-            return redirect('ocr:vision_settings')
-        config = draft
+    action = request.POST.get('action', 'save')
+    draft = apply_vision_config_form(config, request, commit=action == 'save')
+    check_result = check_vision_config(draft)
+    if action == 'save':
+        if check_result.ok:
+            messages.success(request, '视觉辅助配置已保存')
+        else:
+            messages.warning(request, '配置已保存，但仍有项目需要补全')
+        return redirect(settings_url)
 
-    if check_result is None:
-        check_result = check_vision_config(config)
+    from apps.settings_center.views import render_settings_center
 
-    return render(request, 'ocr/vision_settings.html', {
-        'config': config,
-        'check_result': check_result,
-        'provider_choices': VisionProviderConfig.PROVIDER_CHOICES,
-    })
+    return render_settings_center(
+        request,
+        active_section='vision',
+        vision_config=draft,
+        vision_check_result=check_result,
+    )
 
 
 def llm_settings(request):
-    """Text model provider management. Local checks only; no remote API call."""
-    if request.method == 'POST':
-        action = request.POST.get('action', 'save')
-        if action == 'delete':
-            config_id = _coerce_int(request.POST.get('config_id'))
-            deleted, _ = LLMProviderConfig.objects.filter(pk=config_id).delete()
-            if deleted:
-                messages.success(request, '大模型配置已删除')
-            else:
-                messages.warning(request, '未找到要删除的配置')
-            return redirect('ocr:llm_settings')
+    """旧文本模型入口：保留 POST 兼容并跳转到设置中心。"""
+    settings_url = '/settings/?section=llm'
+    if request.method != 'POST':
+        return redirect(settings_url)
 
-        config_id = _coerce_int(request.POST.get('config_id'))
-        if action == 'create':
-            config = LLMProviderConfig(created_by=request.user)
+    action = request.POST.get('action', 'save')
+    if action == 'delete':
+        config_id = coerce_int(request.POST.get('config_id'))
+        deleted, _ = LLMProviderConfig.objects.filter(pk=config_id).delete()
+        if deleted:
+            messages.success(request, '大模型配置已删除')
         else:
-            config = LLMProviderConfig.objects.filter(pk=config_id).first()
-            if not config:
-                messages.warning(request, '未找到要保存的配置')
-                return redirect('ocr:llm_settings')
-        _apply_llm_config_form(config, request, commit=True)
-        messages.success(request, '大模型配置已保存')
-        return redirect('ocr:llm_settings')
+            messages.warning(request, '未找到要删除的配置')
+        return redirect(settings_url)
 
-    configs = list(LLMProviderConfig.objects.order_by('priority', 'id'))
-    config_cards = [
-        {
-            'config': config,
-            'check_messages': _llm_config_messages(config),
-        }
-        for config in configs
-    ]
-    active_complete_count = len([
-        card
-        for card in config_cards
-        if card['config'].enabled and not card['check_messages']
-    ])
-    return render(request, 'ocr/llm_settings.html', {
-        'config_cards': config_cards,
-        'active_complete_count': active_complete_count,
-    })
+    config_id = coerce_int(request.POST.get('config_id'))
+    if action == 'create':
+        config = LLMProviderConfig(created_by=request.user)
+    else:
+        config = LLMProviderConfig.objects.filter(pk=config_id).first()
+        if not config:
+            messages.warning(request, '未找到要保存的配置')
+            return redirect(settings_url)
+    apply_llm_config_form(config, request, commit=True)
+    messages.success(request, '大模型配置已保存')
+    return redirect(settings_url)
 
 
 def confirm(request):
@@ -199,6 +190,7 @@ def confirm(request):
     quantities = request.POST.getlist('quantity[]')
     unit_prices = request.POST.getlist('unit_price[]')
     dish_ids = request.POST.getlist('dish_id[]')
+    original_names = request.POST.getlist('original_name[]')
 
     if not dish_names:
         messages.error(request, '没有要保存的食材')
@@ -230,18 +222,22 @@ def confirm(request):
             qty = _parse_decimal(quantities[i] if i < len(quantities) else '', Decimal('1'))
             price_str = unit_prices[i] if i < len(unit_prices) else ''
             price = _parse_decimal(price_str, None)
-            did = dish_ids[i] if i < len(dish_ids) and dish_ids[i] else None
             inferred_category = infer_dish_category(name)
 
-            # 尝试匹配食材
+            # 名称未编辑时保留结果页的模糊匹配；编辑后只按最终名称精确匹配，
+            # 避免隐藏 dish_id 指向旧食材，也避免相似新名称被错误合并。
             dish = None
             is_matched = False
-            if did:
+            did = dish_ids[i] if i < len(dish_ids) and dish_ids[i] else None
+            original_name = original_names[i].strip() if i < len(original_names) else ''
+            if did and original_name and name == original_name:
                 try:
-                    dish = Dish.objects.get(id=int(did))
-                    is_matched = True
+                    dish = Dish.objects.get(id=int(did), is_active=True)
                 except (Dish.DoesNotExist, ValueError):
-                    pass
+                    dish = None
+            if dish is None:
+                dish = Dish.objects.filter(name=name, is_active=True).first()
+            is_matched = dish is not None
 
             # 自动创建新食材
             if not dish and auto_create and len(name) >= 2:
@@ -331,109 +327,6 @@ def _should_use_vision_fallback(ocr_lines, parsed_items):
     if not confidences:
         return True
     return sum(confidences) / len(confidences) < 0.55
-
-
-def _apply_vision_config_form(config, request, commit=False):
-    target = config if commit else VisionProviderConfig(
-        enabled=config.enabled,
-        provider=config.provider,
-        provider_name=config.provider_name,
-        api_key=config.api_key,
-        base_url=config.base_url,
-        model=config.model,
-        prompt=config.prompt,
-        timeout_seconds=config.timeout_seconds,
-        requests_per_minute=config.requests_per_minute,
-    )
-    target.enabled = request.POST.get('enabled') == 'on'
-    target.provider = request.POST.get('provider', VisionProviderConfig.PROVIDER_OPENAI)
-    target.provider_name = request.POST.get('provider_name', '').strip()
-    if target.provider != VisionProviderConfig.PROVIDER_OPENAI_COMPATIBLE:
-        target.provider_name = ''
-    api_key = request.POST.get('api_key', '').strip()
-    if request.POST.get('clear_api_key') == 'on':
-        target.api_key = ''
-    elif api_key:
-        target.api_key = api_key
-    target.base_url = request.POST.get('base_url', '').strip()
-    if target.provider != VisionProviderConfig.PROVIDER_OPENAI_COMPATIBLE:
-        target.base_url = ''
-    target.model = request.POST.get('model', '').strip()
-    target.prompt = request.POST.get('prompt', '').strip()
-    timeout_value = _parse_decimal(request.POST.get('timeout_seconds'), Decimal('60')) or Decimal('60')
-    target.timeout_seconds = max(int(timeout_value), 1)
-    rpm_value = _parse_decimal(request.POST.get('requests_per_minute'), Decimal('5')) or Decimal('5')
-    target.requests_per_minute = max(int(rpm_value), 1)
-    if commit:
-        if not target.created_by_id:
-            target.created_by = request.user
-        target.updated_by = request.user
-        target.save()
-    return target
-
-
-def _apply_llm_config_form(config: LLMProviderConfig, request, commit=False):
-    config.enabled = request.POST.get('enabled') == 'on'
-    config.name = request.POST.get('name', '').strip() or '未命名模型'
-    config.provider_name = request.POST.get('provider_name', '').strip()
-    api_key = request.POST.get('api_key', '').strip()
-    if request.POST.get('clear_api_key') == 'on':
-        config.api_key = ''
-    elif api_key:
-        config.api_key = api_key
-    config.base_url = request.POST.get('base_url', '').strip().rstrip('/')
-    config.model = request.POST.get('model', '').strip()
-    config.priority = _positive_int_from_post(request.POST.get('priority'), default=10, minimum=1, maximum=9999)
-    config.timeout_seconds = _positive_int_from_post(
-        request.POST.get('timeout_seconds'), default=60, minimum=5, maximum=600
-    )
-    config.requests_per_minute = _positive_int_from_post(
-        request.POST.get('requests_per_minute'), default=5, minimum=1, maximum=120
-    )
-    config.max_concurrency = _positive_int_from_post(
-        request.POST.get('max_concurrency'), default=3, minimum=1, maximum=12
-    )
-    config.expert_concurrency = _positive_int_from_post(
-        request.POST.get('expert_concurrency'), default=3, minimum=1, maximum=3
-    )
-    config.notes = request.POST.get('notes', '').strip()
-    if commit:
-        if not config.created_by_id:
-            config.created_by = request.user
-        config.updated_by = request.user
-        config.save()
-    return config
-
-
-def _llm_config_messages(config: LLMProviderConfig) -> list[str]:
-    messages = []
-    if not config.enabled:
-        messages.append('当前未启用。')
-    if not config.has_api_key:
-        messages.append('请填写 API Key。')
-    if not config.base_url.strip():
-        messages.append('请填写 Base URL。')
-    elif not config.base_url.startswith(('http://', 'https://')):
-        messages.append('Base URL 必须以 http:// 或 https:// 开头。')
-    if not config.model.strip():
-        messages.append('请填写模型名称。')
-    if config.requests_per_minute < 1:
-        messages.append('RPM 必须至少为 1。')
-    if config.max_concurrency < 1:
-        messages.append('最大并发必须至少为 1。')
-    return messages
-
-
-def _positive_int_from_post(value, default: int, minimum: int, maximum: int) -> int:
-    number = _parse_decimal(value, Decimal(default)) or Decimal(default)
-    return max(min(int(number), maximum), minimum)
-
-
-def _coerce_int(value) -> int | None:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def _parse_decimal(value, default):

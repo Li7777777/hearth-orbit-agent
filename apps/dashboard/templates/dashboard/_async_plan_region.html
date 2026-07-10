@@ -1,0 +1,69 @@
+<section id="full-llm-plan-region"
+         class="async-plan-region"
+         aria-live="polite"
+         {% if full_llm_snapshot.status == 'refreshing' %}
+         hx-get="{% url 'dashboard:full_llm_plan_status' %}"
+         hx-trigger="every 4s"
+         hx-swap="outerHTML"
+         {% endif %}>
+    <div class="async-plan-toolbar {% if full_llm_snapshot.status == 'error' %}is-error{% elif full_llm_snapshot.status == 'refreshing' %}is-refreshing{% endif %}">
+        <div class="async-plan-state">
+            <span class="async-plan-state-icon" aria-hidden="true"></span>
+            <span>
+                {% if full_llm_snapshot.status == 'refreshing' %}
+                <strong>推荐正在后台更新</strong>
+                <small>{% if full_llm_snapshot.rendered_html %}当前先展示上一次结果，你可以正常浏览。{% else %}生成完成后会自动出现在这里，无需停留等待。{% endif %}</small>
+                {% elif full_llm_snapshot.status == 'ready' %}
+                <strong>后台推荐已就绪</strong>
+                <small>更新于 {{ full_llm_snapshot.generated_at|date:"m月d日 H:i" }}，系统会按有效期自动刷新。</small>
+                {% elif full_llm_snapshot.status == 'error' %}
+                <strong>本次后台更新未完成</strong>
+                <small>{{ full_llm_snapshot.error_message|default:"模型暂时不可用，稍后会再次尝试。"|truncatechars:110 }}</small>
+                {% else %}
+                <strong>等待后台生成推荐</strong>
+                <small>页面不会等待模型调用，你可以手动启动或由系统稍后刷新。</small>
+                {% endif %}
+            </span>
+        </div>
+        <form method="post"
+              action="{% url 'dashboard:full_llm_plan_refresh' %}"
+              hx-post="{% url 'dashboard:full_llm_plan_refresh' %}"
+              hx-target="#full-llm-plan-region"
+              hx-swap="outerHTML">
+            {% csrf_token %}
+            <button type="submit" class="async-plan-refresh" {% if full_llm_snapshot.status == 'refreshing' %}disabled{% endif %}>
+                {% if full_llm_snapshot.status == 'refreshing' %}生成中{% elif full_llm_snapshot.rendered_html %}重新生成{% else %}开始生成{% endif %}
+            </button>
+        </form>
+    </div>
+
+    {% if full_llm_snapshot.rendered_html %}
+        {{ full_llm_snapshot.rendered_html|safe }}
+    {% else %}
+    <div class="section-heading async-section-heading">
+        <div>
+            <span class="section-kicker">BACKGROUND INTELLIGENCE</span>
+            <h2>全大模型多 Agent 方案</h2>
+        </div>
+        <span class="section-meta">后台计算，不阻塞页面</span>
+    </div>
+    <div class="async-plan-placeholder" aria-hidden="true">
+        <div class="async-placeholder-head">
+            <span class="skeleton-line skeleton-kicker"></span>
+            <span class="skeleton-line skeleton-title"></span>
+            <span class="skeleton-line skeleton-copy"></span>
+        </div>
+        <div class="async-placeholder-grid">
+            {% for _ in "123" %}
+            <div class="async-placeholder-card">
+                <span class="skeleton-line skeleton-label"></span>
+                <span class="skeleton-line skeleton-recipe"></span>
+                <span class="skeleton-line skeleton-copy"></span>
+                <span class="skeleton-line skeleton-copy-short"></span>
+                <div class="skeleton-metrics"><i></i><i></i><i></i><i></i></div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</section>

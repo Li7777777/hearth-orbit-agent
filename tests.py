@@ -19,6 +19,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
 
+from apps.dashboard.models import MealPlanSnapshot
 from apps.dishes.models import Dish, DishCategory
 from apps.orders.models import DailyDishStatistic, Order, OrderItem
 from apps.recipes.models import (
@@ -103,7 +104,11 @@ class AuthTestCase(TestCase):
 # ════════════════════════════════════════════════════════════
 # 2. 仪表盘
 # ════════════════════════════════════════════════════════════
-@override_settings(MEAL_AGENT_LLM={'enabled': False, 'reuse_vision_config': True})
+@override_settings(
+    MEAL_AGENT_LLM={'enabled': False, 'reuse_vision_config': True},
+    MEAL_AGENT_FULL_LLM={'enabled': False},
+    MEAL_PLAN_BACKGROUND_REFRESH={'enabled': False, 'refresh_minutes': 240},
+)
 class DashboardTestCase(TestCase):
 
     def setUp(self):
@@ -140,11 +145,15 @@ class DashboardTestCase(TestCase):
         RecipeIngredient.objects.create(recipe=recipe, name='土豆', amount='300g', is_main=True, sort_order=0)
         RecipeIngredient.objects.create(recipe=recipe, name='牛肉', amount='200g', is_main=True, sort_order=1)
 
-        resp = self.client.get(reverse('dashboard:index'))
+        initial_resp = self.client.get(reverse('dashboard:index'))
+        self.assertEqual(initial_resp.status_code, 200)
+        self.assertContains(initial_resp, '今日推荐菜谱')
+        self.assertNotContains(initial_resp, '命中2/2种食材')
+
+        resp = self.client.get(reverse('dashboard:recipe_recommendations'))
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, '今日推荐菜谱')
         self.assertContains(resp, '土豆炖牛肉')
-        self.assertContains(resp, '命中2/2种食材')
+        self.assertContains(resp, '命中 2/2 种食材')
 
         self.assertTrue(
             RecipeRecommendationHistory.objects.filter(recipe=recipe, recommended_date=date.today()).exists()
@@ -209,9 +218,13 @@ class DashboardTestCase(TestCase):
         RecipeIngredient.objects.create(recipe=lunch, name=potato.name, is_main=True, sort_order=0)
         RecipeIngredient.objects.create(recipe=dinner, name=greens.name, is_main=True, sort_order=0)
 
-        resp = self.client.get(reverse('dashboard:index'))
+        initial_resp = self.client.get(reverse('dashboard:index'))
+        self.assertEqual(initial_resp.status_code, 200)
+        self.assertContains(initial_resp, '今日三餐智能计划')
+        self.assertNotContains(initial_resp, '鸡蛋饼')
+
+        resp = self.client.get(reverse('dashboard:local_meal_plan'))
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, '今日三餐智能计划')
         self.assertContains(resp, '早餐')
         self.assertContains(resp, '午餐')
         self.assertContains(resp, '晚餐')
@@ -425,52 +438,29 @@ class DashboardTestCase(TestCase):
         self.assertEqual(config['timeout_seconds'], 150)
         self.assertEqual(config['requests_per_minute'], 5)
 
-    @override_settings(MEAL_AGENT_FULL_LLM={'enabled': True})
-    @patch('apps.dashboard.views.build_full_llm_multi_agent_meal_plan')
-    def test_dashboard_renders_full_llm_plan_when_enabled(self, mock_full_llm_plan):
-        recipe = Recipe.objects.create(name='模型理由测试菜谱', created_by=self.user)
-        mock_full_llm_plan.return_value = {
-            'date': date.today(),
-            'kicker': 'Full-LLM Multi-Agent',
-            'title': '全大模型三餐方案',
-            'architecture': '测试架构',
-            'agent_cards': [],
-            'meals': [
-                {
-                    'key': 'breakfast',
-                    'label': '早餐',
-                    'intent': '测试餐段',
-                    'selected': {
-                        'recipe': recipe,
-                        'score': 91,
-                        'matched_ingredient_count': 1,
-                        'total_ingredient_count': 1,
-                        'coverage_percent': 100,
-                        'estimated_cost': 3,
-                        'matched_dish_names': ['鸡蛋'],
-                        'agent_votes': [{'name': '库存LLM', 'score': 91, 'label': '库存命中'}],
-                        'reason': '短理由展示。',
-                        'reason_details': ['详细理由会提供给前端'],
-                    },
-                    'alternatives': [],
-                    'summary': '早餐推荐模型理由测试菜谱',
-                },
-            ],
-            'llm_status': {
-                'enabled': True,
-                'used': False,
-                'provider_label': '测试模型',
-                'message': '等待配置',
-            },
-        }
+    @override_settings(
+        MEAL_AGENT_FULL_LLM={'enabled': True},
+        MEAL_PLAN_BACKGROUND_REFRESH={'enabled': False, 'refresh_minutes': 240},
+    )
+    def test_dashboard_renders_cached_full_llm_plan_without_waiting_for_model(self):
+        MealPlanSnapshot.objects.create(
+            key=MealPlanSnapshot.KEY_FULL_LLM,
+            status=MealPlanSnapshot.STATUS_READY,
+            rendered_html=(
+                '<section><h2>全大模型多 Agent 方案</h2>'
+                '<p>全大模型三餐方案</p><p>详细理由会提供给前端</p></section>'
+            ),
+            generated_for=date.today(),
+        )
 
-        resp = self.client.get(reverse('dashboard:index'))
+        with patch('apps.dashboard.recommendations.build_full_llm_multi_agent_meal_plan') as mock_builder:
+            resp = self.client.get(reverse('dashboard:index'))
 
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, '全大模型多 Agent 方案')
         self.assertContains(resp, '全大模型三餐方案')
         self.assertContains(resp, '详细理由会提供给前端')
-        mock_full_llm_plan.assert_called_once()
+        mock_builder.assert_not_called()
 
     @patch('apps.recipes.meal_agents.urlopen')
     def test_reasoning_model_uses_larger_generation_budget(self, mock_urlopen):
@@ -723,7 +713,7 @@ class DashboardTestCase(TestCase):
                 matched_ingredient_count=2,
             )
 
-        resp = self.client.get(reverse('dashboard:index'))
+        resp = self.client.get(reverse('dashboard:recipe_recommendations'))
         self.assertEqual(resp.status_code, 200)
         content = resp.content.decode('utf-8')
         self.assertIn('新鲜候选菜谱', content)

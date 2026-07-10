@@ -45,7 +45,7 @@
             <span style="color:var(--label-tertiary);" x-text="show ? '收起' : '展开'"></span>
         </div>
         <div class="ios-card-body" x-show="show" x-transition>
-            <img src="{{ order.ocr_image.url }}" style="width:100%;border-radius:var(--r-sm);">
+            <img src="{{ order.ocr_image.url }}" alt="订单原始截图" style="width:100%;border-radius:var(--r-sm);">
         </div>
     </div>
     {% endif %}

@@ -114,6 +114,26 @@ Copy-Item .env.example .env
 - `DEBUG=false` 时必须显式配置 `ALLOWED_HOSTS`。
 - 第三方模型 Key 不写入 README、代码、测试文件或提交历史。
 
+## 异步三餐推荐
+
+首页不会直接等待大模型。它会立即展示本地确定性方案和最近一次全大模型推荐快照；快照过期后，系统在后台无感刷新，并通过 HTMX 自动更新推荐区域。
+
+刷新行为可通过 `.env` 调整：
+
+```env
+MEAL_PLAN_BACKGROUND_REFRESH_ENABLED=true
+MEAL_PLAN_BACKGROUND_REFRESH_MINUTES=240
+MEAL_PLAN_BACKGROUND_ERROR_RETRY_MINUTES=30
+```
+
+需要使用 Windows 任务计划或 cron 定时预热时，可独立运行：
+
+```powershell
+uv run python manage.py refresh_meal_plan --force
+```
+
+不加 `--force` 时，仅在快照过期后生成。模型响应慢或暂时失败不会拖慢首页，旧快照仍可继续展示；失败后默认冷却 30 分钟再自动重试，避免持续请求异常模型。
+
 ## 数据库
 
 默认使用 SQLite：

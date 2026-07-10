@@ -2,22 +2,55 @@
 {% block title %}登录 - AI菜量菜谱{% endblock %}
 {% block content %}
 <div class="login-page">
-    <div class="login-card">
-        <div class="login-title">AI菜量菜谱</div>
-        <div class="login-subtitle">智能订单识别与菜量管理</div>
+    <section class="login-visual" aria-label="产品简介">
+        <div class="login-brand">
+            <span class="app-brand-mark login-brand-mark" aria-hidden="true">
+                <svg viewBox="0 0 40 40"><path d="M11.5 22.5c0-6.3 4.1-11.6 9.8-13.5-1.9 2.2-3 5-3 8 0 5.2 3.2 9.6 7.8 11.4A13.8 13.8 0 0 1 20 30c-3.2 0-6.1-1.1-8.5-3v-4.5Z"/><circle cx="25.5" cy="13.5" r="3.2"/><path d="M7 28.5c5.3 4.8 14.1 6.3 21.6 2.4 3.1-1.6 5.3-3.9 6.4-6.2"/></svg>
+            </span>
+            <span><strong>炉火星环</strong><small>HEARTH ORBIT</small></span>
+        </div>
+        <div class="login-story">
+            <span class="login-kicker">AI KITCHEN OPERATING SYSTEM</span>
+            <h1>让每一份食材，<br>都有清晰去向。</h1>
+            <p>从订单识别到库存流转，再到每日菜谱编排，一个更安静、更聪明的家庭厨房中枢。</p>
+            <div class="login-feature-row">
+                <span>智能识别</span><span>库存轨迹</span><span>三餐编排</span>
+            </div>
+        </div>
+        <div class="orbit-visual" aria-hidden="true">
+            <span class="orbit-core"></span>
+            <span class="orbit-ring orbit-ring-one"></span>
+            <span class="orbit-ring orbit-ring-two"></span>
+            <span class="orbit-node orbit-node-one"></span>
+            <span class="orbit-node orbit-node-two"></span>
+        </div>
+    </section>
 
-        {% if messages %}
-        {% for msg in messages %}
-        <div class="login-error">{{ msg }}</div>
-        {% endfor %}
-        {% endif %}
+    <section class="login-panel">
+        <div class="login-card">
+            <div class="login-mobile-brand">炉火星环 <span>HEARTH ORBIT</span></div>
+            <div class="login-title">欢迎回来</div>
+            <div class="login-subtitle">登录 AI菜量菜谱，继续管理你的厨房轨道。</div>
 
-        <form method="post">
-            {% csrf_token %}
-            <input type="text" name="username" class="login-input" placeholder="用户名" required autocomplete="username">
-            <input type="password" name="password" class="login-input" placeholder="密码" required autocomplete="current-password">
-            <button type="submit" class="btn btn-primary btn-block" style="margin-top:4px;">登录</button>
-        </form>
-    </div>
+            {% if messages %}
+            {% for msg in messages %}
+            <div class="login-error" role="alert">{{ msg }}</div>
+            {% endfor %}
+            {% endif %}
+
+            <form method="post" class="login-form">
+                {% csrf_token %}
+                {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
+                <label for="id_username">用户名</label>
+                <input id="id_username" type="text" name="username" class="login-input" placeholder="请输入用户名" required autocomplete="username">
+                <label for="id_password">密码</label>
+                <input id="id_password" type="password" name="password" class="login-input" placeholder="请输入密码" required autocomplete="current-password">
+                <button type="submit" class="btn btn-primary btn-block login-submit">
+                    <span>登录工作台</span><span aria-hidden="true">→</span>
+                </button>
+            </form>
+            <p class="login-footnote"><span></span> 本地私有部署 · 数据由你掌控</p>
+        </div>
+    </section>
 </div>
 {% endblock %}

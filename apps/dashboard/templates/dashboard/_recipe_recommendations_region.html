@@ -1,0 +1,66 @@
+<article id="dashboard-recipe-recommendations"
+         class="dashboard-panel dashboard-panel-wide"
+         {% if not recommendations_loaded %}
+         hx-get="{% url 'dashboard:recipe_recommendations' %}"
+         hx-trigger="load"
+         hx-swap="outerHTML"
+         {% endif %}>
+    <div class="panel-heading">
+        <div>
+            <span class="panel-kicker">SMART MATCH</span>
+            <h2>今日推荐菜谱</h2>
+        </div>
+        <a href="{% url 'recipes:list' %}" class="text-link">查看菜谱智库 <span>→</span></a>
+    </div>
+    <div class="ios-list dashboard-list">
+        {% if recommendations_error %}
+            <div class="ios-list-item compact-empty recommendation-error-state">
+                <div class="ios-list-item-content">
+                    <div class="ios-list-item-title">菜谱推荐加载失败</div>
+                    <div class="ios-list-item-subtitle">{{ recommendations_error }}</div>
+                </div>
+                <button type="button" class="async-plan-refresh"
+                        hx-get="{% url 'dashboard:recipe_recommendations' %}"
+                        hx-target="#dashboard-recipe-recommendations"
+                        hx-swap="outerHTML">重试</button>
+            </div>
+        {% elif recommendations_loaded %}
+            {% if recommended_recipes %}
+                {% for item in recommended_recipes %}
+                <a href="{% url 'recipes:detail' pk=item.recipe.pk %}" class="ios-list-item recommendation-item">
+                    <span class="list-rank">{{ forloop.counter|stringformat:"02d" }}</span>
+                    <div class="ios-list-item-content">
+                        <div class="ios-list-item-title">{{ item.recipe.name }}</div>
+                        <div class="ios-list-item-subtitle">
+                            {% if item.recipe.category %}{{ item.recipe.category.icon }} {{ item.recipe.category.name }} · {% endif %}
+                            命中 {{ item.matched_ingredient_count }}/{{ item.total_ingredient_count }} 种食材 · 平均入库 {{ item.avg_stock_days }} 天
+                        </div>
+                        {% if item.matched_dish_names %}
+                        <div class="ios-list-item-subtitle matched-line">{{ item.matched_dish_names|join:" · " }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="score-badge">{{ item.score }}</div>
+                </a>
+                {% endfor %}
+            {% else %}
+                <div class="ios-list-item compact-empty">
+                    <div class="ios-list-item-content">
+                        <div class="ios-list-item-title">还没有匹配结果</div>
+                        <div class="ios-list-item-subtitle">补充食材和菜谱后，系统会自动生成推荐。</div>
+                    </div>
+                </div>
+            {% endif %}
+        {% else %}
+            {% for _ in "12345" %}
+            <div class="ios-list-item recommendation-skeleton-row" aria-hidden="true">
+                <span class="skeleton-line skeleton-rank"></span>
+                <div class="recommendation-skeleton-copy">
+                    <span class="skeleton-line skeleton-rec-title"></span>
+                    <span class="skeleton-line skeleton-rec-meta"></span>
+                </div>
+                <span class="skeleton-line skeleton-score"></span>
+            </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+</article>

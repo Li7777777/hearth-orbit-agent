@@ -148,7 +148,7 @@
                 <label class="ios-form-label" style="width:auto;margin-bottom:var(--sp-sm);">成品图片</label>
                 {% if recipe.image %}
                 <div style="margin-bottom:var(--sp-sm);">
-                    <img src="{{ recipe.image.url }}" style="max-height:120px;border-radius:var(--r-sm);object-fit:cover;">
+                    <img src="{{ recipe.image.url }}" alt="{{ recipe.name }}成品图" style="max-height:120px;border-radius:var(--r-sm);object-fit:cover;">
                 </div>
                 {% endif %}
                 {% render_field form.image class="ios-form-input-full" %}

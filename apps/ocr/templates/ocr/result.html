@@ -32,7 +32,7 @@
         识别结果（{{ item_count }} 项，可编辑）{% if recognition_method %} · {{ recognition_method }}{% endif %}
     </div>
     <div style="margin:0 var(--sp-md);overflow-x:auto;">
-        <form id="confirmForm" method="post" action="{% url 'ocr:confirm' %}">
+        <form id="confirmForm" method="post" action="{% url 'ocr:confirm' %}" @submit="isSubmitting=true">
             {% csrf_token %}
             <input type="hidden" name="image_path" value="{{ image_path }}">
             <input type="hidden" name="raw_text" value="{{ raw_text }}">
@@ -51,8 +51,9 @@
                     <template x-for="(item, idx) in items" :key="idx">
                         <tr>
                             <td>
-                                <input type="text" :name="'dish_name[]'" x-model="item.dish_name">
+                                <input type="text" :name="'dish_name[]'" x-model="item.dish_name" @input="handleNameChange(item)">
                                 <input type="hidden" :name="'dish_id[]'" x-model="item.dish_id">
+                                <input type="hidden" :name="'original_name[]'" x-model="item.original_name">
                             </td>
                             <td><input type="number" :name="'quantity[]'" x-model="item.quantity" step="0.5" min="0.5" style="width:50px;text-align:center;"></td>
                             <td><input type="number" :name="'unit_price[]'" x-model="item.unit_price" step="0.01" min="0" style="width:70px;text-align:center;"></td>
@@ -83,7 +84,9 @@
 
             <!-- 提交 -->
             <div style="padding:var(--sp-md) 0;">
-                <button type="submit" class="btn btn-primary btn-block">确认并保存订单</button>
+                <button type="submit" class="btn btn-primary btn-block" :disabled="isSubmitting">
+                    <span x-text="isSubmitting ? '正在保存订单…' : '确认并保存订单'"></span>
+                </button>
             </div>
         </form>
     </div>
@@ -94,8 +97,13 @@
 <script>
 function ocrResult() {
     return {
-        items: {{ items_json|safe }},
+        items: {{ items_json|safe }}.map(item => ({ ...item, original_name: item.dish_name })),
         showImage: false,
+        isSubmitting: false,
+        handleNameChange(item) {
+            item.dish_id = '';
+            item.is_matched = false;
+        },
         addRow() {
             this.items.push({
                 dish_name: '',
@@ -103,6 +111,7 @@ function ocrResult() {
                 unit_price: '',
                 dish_id: '',
                 is_matched: false,
+                original_name: '',
             });
         },
         removeLastRow() {

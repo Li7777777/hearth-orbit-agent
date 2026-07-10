@@ -1,0 +1,99 @@
+<header class="settings-section-heading">
+    <div>
+        <span class="settings-eyebrow">Background intelligence</span>
+        <h2>推荐调度</h2>
+        <p>首页读取快照，模型在后台更新。</p>
+    </div>
+    <span class="badge {% if runtime_preferences.full_llm_enabled %}badge-success{% else %}badge-primary{% endif %}">
+        {% if runtime_preferences.full_llm_enabled %}运行中{% else %}已停用{% endif %}
+    </span>
+</header>
+
+<div class="settings-snapshot-panel">
+    <div class="settings-snapshot-status">
+        <span class="snapshot-status-dot status-{{ snapshot.status }}"></span>
+        <div>
+            <strong>{{ snapshot.get_status_display }}</strong>
+            <small>
+                {% if snapshot.generated_at %}最近生成 {{ snapshot.generated_at|date:"Y-m-d H:i" }}
+                {% elif snapshot.last_attempt_at %}最近尝试 {{ snapshot.last_attempt_at|date:"Y-m-d H:i" }}
+                {% else %}尚未生成推荐快照{% endif %}
+            </small>
+        </div>
+    </div>
+    <form method="post" action="{% url 'settings_center:index' %}">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="recommendation">
+        <button type="submit" name="action" value="runtime_refresh" class="btn btn-secondary btn-sm"
+                {% if snapshot.status == 'refreshing' %}disabled{% endif %}>
+            {% if snapshot.status == 'refreshing' %}后台刷新中{% else %}立即刷新{% endif %}
+        </button>
+    </form>
+</div>
+
+{% if snapshot.error_message %}
+<div class="settings-inline-state is-warning" role="status">
+    <span class="settings-state-dot"></span>
+    <div><strong>最近一次生成未完成</strong><p>{{ snapshot.error_message }}</p></div>
+</div>
+{% endif %}
+
+<form method="post" action="{% url 'settings_center:index' %}" class="settings-form">
+    {% csrf_token %}
+    <input type="hidden" name="section" value="recommendation">
+
+    <fieldset class="settings-fieldset">
+        <legend>运行开关</legend>
+        <div class="settings-runtime-list">
+            <label class="settings-runtime-row">
+                <span>
+                    <strong>全大模型推荐</strong>
+                    <small>来源：{{ runtime_preferences.full_llm_source }}</small>
+                </span>
+                <span class="ios-toggle">
+                    <input type="checkbox" name="full_llm_enabled" {% if runtime_preferences.full_llm_enabled %}checked{% endif %}>
+                    <span class="ios-toggle-track"></span>
+                </span>
+            </label>
+            <label class="settings-runtime-row">
+                <span>
+                    <strong>后台自动刷新</strong>
+                    <small>来源：{{ runtime_preferences.background_refresh_source }}</small>
+                </span>
+                <span class="ios-toggle">
+                    <input type="checkbox" name="background_refresh_enabled" {% if runtime_preferences.background_refresh_enabled %}checked{% endif %}>
+                    <span class="ios-toggle-track"></span>
+                </span>
+            </label>
+        </div>
+    </fieldset>
+
+    <fieldset class="settings-fieldset">
+        <legend>时间策略</legend>
+        <div class="settings-field-grid">
+            <label class="settings-field">
+                <span>刷新周期（分钟）</span>
+                <input type="number" name="refresh_minutes" value="{{ runtime_preferences.refresh_minutes }}" min="5" max="10080" step="5">
+                <small>来源：{{ runtime_preferences.refresh_minutes_source }}</small>
+            </label>
+            <label class="settings-field">
+                <span>失败重试（分钟）</span>
+                <input type="number" name="error_retry_minutes" value="{{ runtime_preferences.error_retry_minutes }}" min="1" max="1440" step="1">
+                <small>来源：{{ runtime_preferences.error_retry_minutes_source }}</small>
+            </label>
+        </div>
+    </fieldset>
+
+    <div class="settings-model-readiness {% if active_complete_count %}is-ready{% else %}is-warning{% endif %}">
+        <span class="settings-state-dot"></span>
+        <div>
+            <strong>{% if active_complete_count %}{{ active_complete_count }} 个文本模型可参与调度{% else %}没有可用的文本模型{% endif %}</strong>
+            <button type="button" @click="selectSection('llm')">查看模型配置</button>
+        </div>
+    </div>
+
+    <div class="settings-form-actions settings-form-actions-between">
+        <button type="submit" name="action" value="runtime_reset" class="btn btn-secondary">恢复 .env 配置</button>
+        <button type="submit" name="action" value="runtime_save" class="btn btn-primary">保存调度设置</button>
+    </div>
+</form>

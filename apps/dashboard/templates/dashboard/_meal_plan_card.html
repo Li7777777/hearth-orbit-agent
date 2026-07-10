@@ -1,4 +1,10 @@
-<div class="section-title">{{ section_title }}</div>
+<div class="section-heading">
+    <div>
+        <span class="section-kicker">ORBIT PLANNER</span>
+        <h2>{{ section_title }}</h2>
+    </div>
+    <span class="section-meta">库存与偏好实时编排</span>
+</div>
 <div class="meal-plan-card">
     <div class="meal-plan-hero">
         <div>
@@ -42,11 +48,14 @@
             {% endif %}
             <div class="meal-reason">{{ meal.selected.reason }}</div>
             {% if meal.selected.reason_details %}
-            <div class="meal-reason-details">
-                {% for detail in meal.selected.reason_details %}
-                <div class="meal-reason-detail">{{ detail }}</div>
-                {% endfor %}
-            </div>
+            <details class="meal-detail-disclosure">
+                <summary>查看评分依据</summary>
+                <div class="meal-reason-details">
+                    {% for detail in meal.selected.reason_details %}
+                    <div class="meal-reason-detail">{{ detail }}</div>
+                    {% endfor %}
+                </div>
+            </details>
             {% endif %}
 
             <div class="agent-vote-row">
@@ -60,12 +69,14 @@
             </div>
 
             {% if meal.alternatives %}
-            <div class="meal-alt">
-                备选：
-                {% for alt in meal.alternatives %}
-                <a href="{% url 'recipes:detail' pk=alt.recipe.pk %}">{{ alt.recipe.name }}</a>{% if not forloop.last %}、{% endif %}
-                {% endfor %}
-            </div>
+            <details class="meal-alt">
+                <summary>{{ meal.alternatives|length }} 个备选方案</summary>
+                <div class="meal-alt-links">
+                    {% for alt in meal.alternatives %}
+                    <a href="{% url 'recipes:detail' pk=alt.recipe.pk %}">{{ alt.recipe.name }}</a>
+                    {% endfor %}
+                </div>
+            </details>
             {% endif %}
             {% else %}
             <div class="meal-empty">{{ meal.summary }}</div>
@@ -74,19 +85,27 @@
         {% endfor %}
     </div>
 
-    <div class="agent-evidence-grid">
-        {% for agent in plan.agent_cards %}
-        <div class="agent-evidence">
-            <div class="agent-evidence-title">{{ agent.name }}</div>
-            <div class="agent-evidence-role">{{ agent.role }}</div>
-            {% for finding in agent.findings %}
-            <div class="agent-evidence-finding">{{ finding }}</div>
+    <details class="agent-disclosure">
+        <summary>
+            <span>
+                <strong>Agent 决策依据</strong>
+                <small>展开查看库存、行为、成本与采购信号</small>
+            </span>
+            <span class="disclosure-action">查看详情</span>
+        </summary>
+        <div class="agent-evidence-grid">
+            {% for agent in plan.agent_cards %}
+            <div class="agent-evidence">
+                <div class="agent-evidence-title">{{ agent.name }}</div>
+                <div class="agent-evidence-role">{{ agent.role }}</div>
+                {% for finding in agent.findings %}
+                <div class="agent-evidence-finding">{{ finding }}</div>
+                {% endfor %}
+            </div>
             {% endfor %}
         </div>
-        {% endfor %}
-    </div>
-
-    <div class="meal-llm-note">
-        {{ plan.llm_status.provider_label }}：{{ plan.llm_status.message }}
-    </div>
+        <div class="meal-llm-note">
+            {{ plan.llm_status.provider_label }}：{{ plan.llm_status.message }}
+        </div>
+    </details>
 </div>

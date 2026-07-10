@@ -1,0 +1,38 @@
+<header class="settings-section-heading">
+    <div>
+        <span class="settings-eyebrow">Runtime</span>
+        <h2>系统信息</h2>
+        <p>只读运行环境，不显示密钥。</p>
+    </div>
+    <span class="badge {% if system_info.debug %}badge-warning{% else %}badge-success{% endif %}">
+        {% if system_info.debug %}开发模式{% else %}生产模式{% endif %}
+    </span>
+</header>
+
+<dl class="settings-system-list">
+    <div>
+        <dt>数据库</dt>
+        <dd>{{ system_info.database }}</dd>
+    </div>
+    <div>
+        <dt>时区</dt>
+        <dd>{{ system_info.timezone }}</dd>
+    </div>
+    <div>
+        <dt>媒体目录</dt>
+        <dd><span class="settings-path">{{ system_info.media_root }}</span><span class="settings-readiness {% if system_info.media_ready %}is-ready{% endif %}">{% if system_info.media_ready %}可用{% else %}待创建{% endif %}</span></dd>
+    </div>
+    <div>
+        <dt>外部菜谱仓库</dt>
+        <dd><a href="{{ system_info.recipe_repo_url }}" target="_blank" rel="noopener noreferrer">{{ system_info.recipe_repo_url }}</a></dd>
+    </div>
+    <div>
+        <dt>菜谱仓库目录</dt>
+        <dd><span class="settings-path">{{ system_info.recipe_repo_path }}</span><span class="settings-readiness {% if system_info.recipe_repo_ready %}is-ready{% endif %}">{% if system_info.recipe_repo_ready %}已同步{% else %}未同步{% endif %}</span></dd>
+    </div>
+</dl>
+
+<div class="settings-security-note">
+    <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V8a5 5 0 0 1 10 0v2"/><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M12 14v2"/></svg></span>
+    <div><strong>敏感信息已隐藏</strong><small>数据库密码、Secret Key 与模型密钥不会在此显示。</small></div>
+</div>

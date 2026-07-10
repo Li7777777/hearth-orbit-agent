@@ -1,0 +1,56 @@
+<header class="settings-section-heading">
+    <div>
+        <span class="settings-eyebrow">Configuration map</span>
+        <h2>运行概览</h2>
+        <p>所有可编辑配置集中于此。</p>
+    </div>
+    <span class="settings-health-pill"><i></i> 系统在线</span>
+</header>
+
+<div class="settings-status-grid">
+    <button type="button" class="settings-status-card" @click="selectSection('vision')">
+        <span class="settings-status-top">
+            <span class="settings-status-icon icon-vision"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12s3.2-5.5 8.5-5.5 8.5 5.5 8.5 5.5-3.2 5.5-8.5 5.5S3.5 12 3.5 12Z"/><circle cx="12" cy="12" r="2.5"/></svg></span>
+            <span class="badge {% if vision_check_result.ok %}badge-success{% else %}badge-warning{% endif %}">
+                {% if vision_check_result.ok %}可用{% else %}待配置{% endif %}
+            </span>
+        </span>
+        <strong>视觉识别</strong>
+        <small>{{ vision_config.get_provider_display }} · {{ vision_config.model|default:"未设置模型" }}</small>
+    </button>
+    <button type="button" class="settings-status-card" @click="selectSection('llm')">
+        <span class="settings-status-top">
+            <span class="settings-status-icon icon-model"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5.5h10A2.5 2.5 0 0 1 19.5 8v8A2.5 2.5 0 0 1 17 18.5H7A2.5 2.5 0 0 1 4.5 16V8A2.5 2.5 0 0 1 7 5.5Z"/><path d="M9 9.5h6M8.5 14.5h.01M12 14.5h.01M15.5 14.5h.01"/></svg></span>
+            <span class="badge {% if active_complete_count %}badge-success{% else %}badge-warning{% endif %}">{{ active_complete_count }} 可用</span>
+        </span>
+        <strong>文本模型</strong>
+        <small>{{ llm_config_count }} 个配置 · 按优先级调度</small>
+    </button>
+    <button type="button" class="settings-status-card" @click="selectSection('recommendation')">
+        <span class="settings-status-top">
+            <span class="settings-status-icon icon-schedule"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5V12l5-3 4 2.5 7-5"/><path d="M16.5 6.5H20V10"/><path d="M5 20h14"/></svg></span>
+            <span class="badge {% if runtime_preferences.full_llm_enabled %}badge-success{% else %}badge-primary{% endif %}">
+                {% if runtime_preferences.full_llm_enabled %}已启用{% else %}已停用{% endif %}
+            </span>
+        </span>
+        <strong>推荐调度</strong>
+        <small>{{ runtime_preferences.refresh_minutes }} 分钟刷新 · {{ runtime_preferences.full_llm_source }}</small>
+    </button>
+    <button type="button" class="settings-status-card" @click="selectSection('system')">
+        <span class="settings-status-top">
+            <span class="settings-status-icon icon-system"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3M6 6l2.1 2.1M15.9 15.9 18 18M18 6l-2.1 2.1M8.1 15.9 6 18"/><circle cx="12" cy="12" r="3.5"/></svg></span>
+            <span class="badge badge-primary">{{ system_info.database }}</span>
+        </span>
+        <strong>系统环境</strong>
+        <small>{{ system_info.timezone }} · {% if system_info.debug %}开发模式{% else %}生产模式{% endif %}</small>
+    </button>
+</div>
+
+<div class="settings-overview-band">
+    <div>
+        <span class="settings-eyebrow">Recommendation snapshot</span>
+        <h3>三餐推荐快照</h3>
+        <p>{{ snapshot.get_status_display }}{% if snapshot.generated_at %} · {{ snapshot.generated_at|date:"m-d H:i" }}{% endif %}</p>
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm" @click="selectSection('recommendation')">查看调度</button>
+</div>

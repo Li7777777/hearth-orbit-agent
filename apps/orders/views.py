@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.dateparse import parse_date
 
 from apps.dishes.models import Dish
 
@@ -17,16 +18,30 @@ def order_list(request):
     date_to = request.GET.get('date_to', '')
 
     # 默认筛选：最近30天
-    if not date_from and not date_to and 'page' not in request.GET:
+    if not date_from and not date_to:
         today = date.today()
         date_from = (today - timedelta(days=30)).isoformat()
         date_to = today.isoformat()
 
+    parsed_date_from = _safe_parse_date(date_from)
+    parsed_date_to = _safe_parse_date(date_to)
+    if date_from and parsed_date_from is None:
+        messages.warning(request, '开始日期格式无效，已忽略该条件')
+        date_from = ''
+    if date_to and parsed_date_to is None:
+        messages.warning(request, '结束日期格式无效，已忽略该条件')
+        date_to = ''
+    if parsed_date_from and parsed_date_to and parsed_date_from > parsed_date_to:
+        parsed_date_from, parsed_date_to = parsed_date_to, parsed_date_from
+        date_from = parsed_date_from.isoformat()
+        date_to = parsed_date_to.isoformat()
+        messages.info(request, '日期范围顺序已自动调整')
+
     orders = Order.objects.all()
-    if date_from:
-        orders = orders.filter(order_date__gte=date_from)
-    if date_to:
-        orders = orders.filter(order_date__lte=date_to)
+    if parsed_date_from:
+        orders = orders.filter(order_date__gte=parsed_date_from)
+    if parsed_date_to:
+        orders = orders.filter(order_date__lte=parsed_date_to)
 
     paginator = Paginator(orders, 20)
     page_obj = paginator.get_page(request.GET.get('page'))
@@ -36,6 +51,15 @@ def order_list(request):
         'date_from': date_from,
         'date_to': date_to,
     })
+
+
+def _safe_parse_date(value):
+    if not value:
+        return None
+    try:
+        return parse_date(value)
+    except ValueError:
+        return None
 
 
 def order_create(request):

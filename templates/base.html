@@ -6,24 +6,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#F6F8FC">
+    <meta name="description" content="AI 驱动的家庭食材、订单与菜谱智能管理平台">
     <title>{% block title %}AI菜量菜谱{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     {% block extra_head %}{% endblock %}
 </head>
-<body x-data="{ toast: { show: false, msg: '', type: 'success' } }">
+<body class="{% if request.user.is_authenticated %}is-authenticated{% else %}is-guest{% endif %} app-{{ request.resolver_match.app_name|default:'public' }}"
+      x-data="{ toast: { show: false, msg: '', type: 'success' } }">
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+    <div class="app-ambient" aria-hidden="true">
+        <span class="app-ambient-orb app-ambient-orb-one"></span>
+        <span class="app-ambient-orb app-ambient-orb-two"></span>
+    </div>
 
     <!-- Toast 通知 -->
-    <div class="toast-container" x-show="toast.show" x-cloak
+    <div class="toast-container" x-show="toast.show" x-cloak role="status" aria-live="polite"
          x-transition:enter="toastIn"
          @toast.window="toast.msg=$event.detail.msg; toast.type=$event.detail.type||'success'; toast.show=true; setTimeout(()=>toast.show=false, 2500)">
         <div class="toast" :class="'toast-'+toast.type">
+            <span class="toast-indicator" aria-hidden="true"></span>
             <span x-text="toast.msg"></span>
         </div>
     </div>
 
-    {% block content %}{% endblock %}
+    <main id="main-content" class="app-main" tabindex="-1">
+        {% block content %}{% endblock %}
+    </main>
 
     <!-- 底部导航栏 (仅登录后显示) -->
     {% if request.user.is_authenticated %}

@@ -1,0 +1,112 @@
+<div x-data="visionSettings({
+    provider: '{{ vision_config.provider|escapejs }}',
+    baseUrl: '{{ vision_config.base_url|escapejs }}',
+    model: '{{ vision_config.model|escapejs }}',
+    providerName: '{{ vision_config.provider_name|escapejs }}'
+})">
+    <header class="settings-section-heading">
+        <div>
+            <span class="settings-eyebrow">Vision provider</span>
+            <h2>视觉识别</h2>
+            <p>订单截图与食材图片识别。</p>
+        </div>
+        <span class="badge {% if vision_check_result.ok %}badge-success{% else %}badge-warning{% endif %}">
+            {% if vision_check_result.ok %}配置完整{% else %}需要补全{% endif %}
+        </span>
+    </header>
+
+    {% if vision_check_result.messages %}
+    <div class="settings-inline-state {% if vision_check_result.ok %}is-success{% else %}is-warning{% endif %}" role="status">
+        <span class="settings-state-dot"></span>
+        <div>
+            <strong>本地配置检查</strong>
+            <ul>
+                {% for message in vision_check_result.messages %}<li>{{ message }}</li>{% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'settings_center:index' %}" class="settings-form">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="vision">
+
+        <div class="settings-toggle-panel">
+            <div>
+                <strong>视觉辅助</strong>
+                <small>状态变更在下次识别时生效</small>
+            </div>
+            <label class="ios-toggle">
+                <input type="checkbox" name="enabled" {% if vision_config.enabled %}checked{% endif %}>
+                <span class="ios-toggle-track"></span>
+            </label>
+        </div>
+
+        <fieldset class="settings-fieldset">
+            <legend>服务配置</legend>
+            <div class="settings-field-grid">
+                <label class="settings-field">
+                    <span>接口类型</span>
+                    <select name="provider" x-model="provider" @change="applyProviderDefaults()">
+                        {% for value, label in provider_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="settings-field" x-show="provider === 'openai_compatible'" x-cloak>
+                    <span>服务商名称</span>
+                    <input type="text" name="provider_name" x-model="providerName" placeholder="例如：硅基流动">
+                </label>
+                <label class="settings-field settings-field-wide">
+                    <span>视觉模型</span>
+                    <input type="text" name="model" x-model="model" placeholder="视觉模型名称">
+                </label>
+                <label class="settings-field settings-field-wide" x-show="provider === 'openai_compatible'" x-cloak>
+                    <span>Base URL</span>
+                    <input type="url" name="base_url" x-model="baseUrl" placeholder="https://api.example.com/v1">
+                </label>
+                <template x-if="provider !== 'openai_compatible'">
+                    <input type="hidden" name="base_url" value="">
+                </template>
+                <label class="settings-field">
+                    <span>超时（秒）</span>
+                    <input type="number" name="timeout_seconds" value="{{ vision_config.timeout_seconds }}" min="5" max="600" step="1">
+                </label>
+                <label class="settings-field">
+                    <span>每分钟请求数</span>
+                    <input type="number" name="requests_per_minute" value="{{ vision_config.requests_per_minute }}" min="1" max="120" step="1">
+                </label>
+            </div>
+        </fieldset>
+
+        <fieldset class="settings-fieldset">
+            <legend>访问凭证</legend>
+            <div class="settings-field-grid">
+                <label class="settings-field settings-field-wide">
+                    <span>API Key</span>
+                    <input type="password" name="api_key" autocomplete="new-password"
+                           placeholder="{% if vision_config.masked_api_key %}已保存 {{ vision_config.masked_api_key }}，留空保持不变{% else %}粘贴 API Key{% endif %}">
+                </label>
+            </div>
+            {% if vision_config.has_api_key %}
+            <label class="settings-check-row">
+                <input type="checkbox" name="clear_api_key">
+                <span>清空已保存的 API Key</span>
+            </label>
+            {% endif %}
+        </fieldset>
+
+        <fieldset class="settings-fieldset">
+            <legend>识别提示词</legend>
+            <label class="settings-field settings-field-wide">
+                <span>系统提示词</span>
+                <textarea name="prompt" rows="9">{{ vision_config.prompt }}</textarea>
+            </label>
+        </fieldset>
+
+        <div class="settings-form-actions">
+            <button type="submit" name="action" value="vision_check" class="btn btn-secondary">检查填写</button>
+            <button type="submit" name="action" value="vision_save" class="btn btn-primary">保存视觉配置</button>
+        </div>
+    </form>
+</div>

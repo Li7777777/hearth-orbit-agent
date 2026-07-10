@@ -192,6 +192,15 @@ MEAL_AGENT_FULL_LLM = {
     'expert_concurrency': os.getenv('MEAL_AGENT_FULL_LLM_EXPERT_CONCURRENCY', '4').strip(),
 }
 
+# 首页只读取推荐快照；大模型在后台刷新，不阻塞页面请求。
+MEAL_PLAN_BACKGROUND_REFRESH = {
+    'enabled': env_bool('MEAL_PLAN_BACKGROUND_REFRESH_ENABLED', True),
+    'refresh_minutes': os.getenv('MEAL_PLAN_BACKGROUND_REFRESH_MINUTES', '240').strip(),
+    'error_retry_minutes': os.getenv('MEAL_PLAN_BACKGROUND_ERROR_RETRY_MINUTES', '30').strip(),
+}
+if 'test' in sys.argv:
+    MEAL_PLAN_BACKGROUND_REFRESH['enabled'] = False
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ── Logging ──────────────────────────────────────────

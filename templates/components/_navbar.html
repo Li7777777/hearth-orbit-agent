@@ -1,24 +1,54 @@
-{% load static %}
-<!-- 底部 Tab 导航栏 -->
-<nav class="tab-bar">
-    <a href="{% url 'dashboard:index' %}" class="tab-item {% if request.resolver_match.app_name == 'dashboard' %}active{% endif %}">
-        <span class="tab-icon">🏠</span>
-        <span>首页</span>
+<!-- 自适应导航：桌面侧栏 / 移动端悬浮 Dock -->
+<nav class="tab-bar" aria-label="主要导航">
+    <a href="{% url 'dashboard:index' %}" class="app-brand" aria-label="炉火星环首页">
+        <span class="app-brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 40 40" role="img">
+                <path d="M11.5 22.5c0-6.3 4.1-11.6 9.8-13.5-1.9 2.2-3 5-3 8 0 5.2 3.2 9.6 7.8 11.4A13.8 13.8 0 0 1 20 30c-3.2 0-6.1-1.1-8.5-3v-4.5Z"/>
+                <circle cx="25.5" cy="13.5" r="3.2"/>
+                <path d="M7 28.5c5.3 4.8 14.1 6.3 21.6 2.4 3.1-1.6 5.3-3.9 6.4-6.2"/>
+            </svg>
+        </span>
+        <span class="app-brand-copy">
+            <strong>炉火星环</strong>
+            <small>HEARTH ORBIT</small>
+        </span>
     </a>
-    <a href="{% url 'ocr:upload' %}" class="tab-item {% if request.resolver_match.app_name == 'ocr' %}active{% endif %}">
-        <span class="tab-icon">📷</span>
-        <span>识别</span>
-    </a>
-    <a href="{% url 'dishes:list' %}" class="tab-item {% if request.resolver_match.app_name == 'dishes' %}active{% endif %}">
-        <span class="tab-icon">🍽️</span>
-        <span>食材</span>
-    </a>
-    <a href="{% url 'orders:list' %}" class="tab-item {% if request.resolver_match.app_name == 'orders' %}active{% endif %}">
-        <span class="tab-icon">📋</span>
-        <span>订单</span>
-    </a>
-    <a href="{% url 'recipes:list' %}" class="tab-item {% if request.resolver_match.app_name == 'recipes' %}active{% endif %}">
-        <span class="tab-icon">🍳</span>
-        <span>菜谱</span>
-    </a>
+
+    <div class="tab-nav">
+        <a href="{% url 'dashboard:index' %}" class="tab-item {% if request.resolver_match.app_name == 'dashboard' %}active{% endif %}"
+           {% if request.resolver_match.app_name == 'dashboard' %}aria-current="page"{% endif %}>
+            <span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-8Z"/><path d="M9.5 20v-6h5v6"/></svg></span>
+            <span class="tab-label">总览</span>
+        </a>
+        <a href="{% url 'ocr:upload' %}" class="tab-item {% if request.resolver_match.app_name == 'ocr' %}active{% endif %}"
+           {% if request.resolver_match.app_name == 'ocr' %}aria-current="page"{% endif %}>
+            <span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 8.5h3l1.5-2h7l1.5 2h3v10.5H4V8.5Z"/><circle cx="12" cy="13.5" r="3.5"/><path d="M18 4v3M16.5 5.5h3"/></svg></span>
+            <span class="tab-label">智能识别</span>
+        </a>
+        <a href="{% url 'dishes:list' %}" class="tab-item {% if request.resolver_match.app_name == 'dishes' %}active{% endif %}"
+           {% if request.resolver_match.app_name == 'dishes' %}aria-current="page"{% endif %}>
+            <span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4.5 6.5h15v13h-15v-13Z"/><path d="M8 6.5v-2h8v2M4.5 11h15M9 15h6"/></svg></span>
+            <span class="tab-label">食材库存</span>
+        </a>
+        <a href="{% url 'orders:list' %}" class="tab-item {% if request.resolver_match.app_name == 'orders' %}active{% endif %}"
+           {% if request.resolver_match.app_name == 'orders' %}aria-current="page"{% endif %}>
+            <span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 4.5h12v15H6v-15Z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span>
+            <span class="tab-label">订单记录</span>
+        </a>
+        <a href="{% url 'recipes:list' %}" class="tab-item {% if request.resolver_match.app_name == 'recipes' %}active{% endif %}"
+           {% if request.resolver_match.app_name == 'recipes' %}aria-current="page"{% endif %}>
+            <span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 8.5h14v10H5v-10Z"/><path d="M8 8.5V6.8A2.8 2.8 0 0 1 10.8 4h2.4A2.8 2.8 0 0 1 16 6.8v1.7M9 13h6"/></svg></span>
+            <span class="tab-label">菜谱智库</span>
+        </a>
+    </div>
+
+    <div class="tab-footer">
+        <div class="user-chip">
+            <span class="user-avatar">{{ request.user.username|first|upper }}</span>
+            <span class="user-meta"><strong>{{ request.user.username }}</strong><small><i></i> 系统在线</small></span>
+        </div>
+        <a href="{% url 'accounts:logout' %}" class="nav-logout" aria-label="退出登录" title="退出登录">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"/></svg>
+        </a>
+    </div>
 </nav>

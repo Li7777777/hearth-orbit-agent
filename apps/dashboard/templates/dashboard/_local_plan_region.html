@@ -1,0 +1,48 @@
+<section id="local-meal-plan-region"
+         class="local-plan-region"
+         {% if not daily_meal_plan and not local_plan_error %}
+         hx-get="{% url 'dashboard:local_meal_plan' %}"
+         hx-trigger="load"
+         hx-swap="outerHTML"
+         {% endif %}>
+    {% if daily_meal_plan %}
+        {% include "dashboard/_meal_plan_card.html" with section_title="今日三餐智能计划" plan=daily_meal_plan %}
+    {% elif local_plan_error %}
+        <div class="section-heading">
+            <div><span class="section-kicker">ORBIT PLANNER</span><h2>今日三餐智能计划</h2></div>
+        </div>
+        <div class="async-plan-toolbar is-error">
+            <div class="async-plan-state">
+                <span class="async-plan-state-icon" aria-hidden="true"></span>
+                <span><strong>本地推荐加载失败</strong><small>{{ local_plan_error }}</small></span>
+            </div>
+            <button type="button" class="async-plan-refresh"
+                    hx-get="{% url 'dashboard:local_meal_plan' %}"
+                    hx-target="#local-meal-plan-region"
+                    hx-swap="outerHTML">重试</button>
+        </div>
+    {% else %}
+        <div class="section-heading">
+            <div><span class="section-kicker">ORBIT PLANNER</span><h2>今日三餐智能计划</h2></div>
+            <span class="section-meta">正在读取库存与偏好</span>
+        </div>
+        <div class="async-plan-placeholder local-plan-placeholder" aria-hidden="true">
+            <div class="async-placeholder-head">
+                <span class="skeleton-line skeleton-kicker"></span>
+                <span class="skeleton-line skeleton-title"></span>
+                <span class="skeleton-line skeleton-copy"></span>
+            </div>
+            <div class="async-placeholder-grid">
+                {% for _ in "123" %}
+                <div class="async-placeholder-card">
+                    <span class="skeleton-line skeleton-label"></span>
+                    <span class="skeleton-line skeleton-recipe"></span>
+                    <span class="skeleton-line skeleton-copy"></span>
+                    <span class="skeleton-line skeleton-copy-short"></span>
+                    <div class="skeleton-metrics"><i></i><i></i><i></i><i></i></div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+</section>
